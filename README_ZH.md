@@ -63,11 +63,10 @@ uv run python render.py --check
 
 `.github/workflows/pages.yml` 会在 `main` 分支更新时完成校验、测试、构建和发布。首次使用时，在 GitHub 仓库设置中将 Pages Source 选择为 **GitHub Actions**。
 
-构建器同时生成 `manifest.json`。未来 Homepage 可以只读这个公开清单，获取页面标题、摘要、类型、更新时间和 URL，而无需共享数据库或仓库权限。
+构建器必须同时生成 `manifest.json`，列出页面标题、slug、类型、摘要、更新时间和 URL。新增页面未进入清单时不得发布。
 
 ## 安全边界
 
 - AI 可以生成 Markdown、SVG 和动画分镜，但不能直接发布。
 - 人工审核事实、引用、隐私、版权和移动端排版后才合并到 `main`。
-- Wiki 不连接 Homepage 数据库，也不持有 Homepage 的访问凭据。
 - 不要将 `.env`、私人项目数据、API 密钥或真实用户数据放入 `raw/` 或 `wiki/`。

@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import shutil
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
@@ -190,8 +190,17 @@ def write_site(pages: list[Page]) -> None:
     for page in pages:
         target = OUTPUT_ROOT / page.url; target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(page_document(page, pages, page_map), encoding="utf-8")
-    manifest = [{**asdict(page), "path": str(page.path.relative_to(ROOT)), "body": None, "url": page.url} for page in pages]
-    for item in manifest: item.pop("body")
+    manifest = [
+        {
+            "title": page.title,
+            "slug": page.slug,
+            "type": page.kind,
+            "summary": page.summary,
+            "updated": page.updated,
+            "url": page.url,
+        }
+        for page in pages
+    ]
     (OUTPUT_ROOT / "manifest.json").write_text(json.dumps({"version": 1, "pages": manifest}, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
