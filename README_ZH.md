@@ -23,14 +23,14 @@ uv sync
 - `render.py`：静态网站构建器。
 - `assets/`：全站样式与滚动动画。
 - `SCHEMA.md`：AI 必须遵循的内容结构与工作流。
-- `AGENT_PLAYBOOK.md`：供没有对话上下文的 Agent 使用的完整操作手册。
+- `AGENTS.md`：仓库规则，以及供没有对话上下文的 Agent 使用的完整操作手册。
 - `index.md`：给人和 AI 使用的知识地图。
 - `log.md`：ingest、query、lint 操作记录。
 - `site/`：本地生成结果，已忽略，不提交。
 
 ## 使用
 
-如果要让另一个 Agent 接手，直接让它先阅读 [`AGENT_PLAYBOOK.md`](./AGENT_PLAYBOOK.md)，再给出来源或具体任务。
+如果要让另一个 Agent 接手，直接让它先阅读 [`AGENTS.md`](./AGENTS.md)，再给出来源或具体任务。
 
 检查内容：
 
