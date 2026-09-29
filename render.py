@@ -15,6 +15,12 @@ WIKI_ROOT = ROOT / "wiki"
 OUTPUT_ROOT = ROOT / "site"
 ALLOWED_TYPES = {"source", "concept", "topic", "thread"}
 ALLOWED_ACCENTS = {"brick", "ochre", "moss", "deep"}
+TYPE_META = {
+    "source": ("Sources", "来源", "论文、文章、视频与代码仓库的精读页"),
+    "concept": ("Concepts", "概念", "跨来源复用的概念与机制"),
+    "topic": ("Topics", "综合", "连接多个来源的横向主题"),
+    "thread": ("Threads", "线索", "持续追踪的问题与思考"),
+}
 WIKILINK = re.compile(r"\[\[([a-z0-9][a-z0-9-]*)(?:\|([^\]]+))?\]\]")
 INLINE = re.compile(r"(`[^`]+`|\*\*[^*]+\*|\[[^\]]+\]\([^)]+\)|\[\[[^\]]+\]\])")
 
@@ -169,14 +175,73 @@ def page_document(page: Page, pages: list[Page], page_map: dict[str, Page]) -> s
     return shell(f"{page.title} · Wiki", "../style.css", body)
 
 
-def index_document(pages: list[Page]) -> str:
+def type_overview(pages: list[Page]) -> str:
+    blocks: list[str] = []
+    for kind, (english, chinese, description) in TYPE_META.items():
+        count = sum(page.kind == kind for page in pages)
+        blocks.append(
+            f'<a class="type-block" href="#type-{kind}">'
+            f'<strong>{count:02}</strong><span>{english} · {chinese}</span>'
+            f'<small>{description}</small></a>'
+        )
+    return '<section class="type-overview" aria-label="按页面类型浏览">' + "".join(blocks) + "</section>"
+
+
+def recent_pages(pages: list[Page]) -> str:
+    ordered = sorted(pages, key=lambda page: (page.updated, page.title), reverse=True)
+    rows: list[str] = []
+    for page in ordered:
+        rows.append(
+            f'<details class="recent-item" data-accent="{page.accent}">'
+            '<summary>'
+            f'<time datetime="{html.escape(page.updated, quote=True)}">{html.escape(page.updated)}</time>'
+            f'<span class="recent-type">{html.escape(page.kind)}</span>'
+            f'<strong>{html.escape(page.title)}</strong>'
+            f'<span class="recent-summary">{html.escape(page.summary)}</span>'
+            '<span class="recent-toggle" aria-hidden="true">+</span>'
+            '</summary>'
+            '<div class="recent-preview">'
+            f'<div><span class="eyebrow">{html.escape(page.kind)} · updated {html.escape(page.updated)}</span>'
+            f'<h3>{html.escape(page.title)}</h3><p>{html.escape(page.summary)}</p></div>'
+            f'<a class="page-link" href="{page.url}">进入完整页面 <span aria-hidden="true">→</span></a>'
+            '</div></details>'
+        )
+    empty = '<p class="empty-state">还没有知识页面。添加第一份来源后，它会出现在这里。</p>'
+    content = "".join(rows) if rows else empty
+    return (
+        '<section class="recent" aria-labelledby="recent-title">'
+        '<div class="section-heading"><span class="section-number">§ 01</span>'
+        '<div><span class="eyebrow">All pages · no pagination</span>'
+        '<h2 id="recent-title">最近更新 <em>Recent</em></h2></div></div>'
+        f'<div class="recent-list">{content}</div></section>'
+    )
+
+
+def type_sections(pages: list[Page]) -> str:
     groups: list[str] = []
-    for kind in ("source", "concept", "topic", "thread"):
-        items = [page for page in pages if page.kind == kind]
-        if not items: continue
-        cards = "".join(f'<a class="card" href="{page.url}"><span>{kind}</span><h2>{html.escape(page.title)}</h2><p>{html.escape(page.summary)}</p><small>{page.updated}</small></a>' for page in items)
-        groups.append(f'<section><div class="rule"><span>{kind}s</span><span>{len(items):02}</span></div><div class="grid">{cards}</div></section>')
-    body = f'''<body><main class="page"><header class="mast"><span>Personal Wiki</span><span>AI maintained · Human reviewed</span></header><div class="cover"><span class="eyebrow">Living notes · {len(pages):03} pages</span><h1>Knowledge,<br><em>kept in motion.</em></h1><p>原始资料负责追溯，Markdown 负责结构，AI 协助整理，人负责判断。</p></div>{''.join(groups)}<footer>Static HTML · GitHub Pages</footer></main></body>'''
+    for kind, (english, chinese, _) in TYPE_META.items():
+        items = sorted(
+            (page for page in pages if page.kind == kind),
+            key=lambda page: (page.updated, page.title),
+            reverse=True,
+        )
+        cards = "".join(
+            f'<a class="card" href="{page.url}"><span>{kind}</span>'
+            f'<h3>{html.escape(page.title)}</h3><p>{html.escape(page.summary)}</p>'
+            f'<small>{html.escape(page.updated)}</small></a>'
+            for page in items
+        )
+        empty = f'<p class="type-empty">暂无{chinese}页面</p>'
+        groups.append(
+            f'<section class="type-section" id="type-{kind}">'
+            f'<div class="rule"><span>{english} · {chinese}</span><span>{len(items):02}</span></div>'
+            f'<div class="grid">{cards or empty}</div></section>'
+        )
+    return "".join(groups)
+
+
+def index_document(pages: list[Page]) -> str:
+    body = f'''<body class="home"><main class="page"><header class="mast"><span>Personal Wiki</span><span>AI maintained · Human reviewed</span></header><div class="cover"><span class="eyebrow">Living notes · {len(pages):03} pages</span><h1>Knowledge,<br><em>kept in motion.</em></h1><p>原始资料负责追溯，Markdown 负责结构，AI 协助整理，人负责判断。</p></div>{type_overview(pages)}{recent_pages(pages)}{type_sections(pages)}<footer>Static HTML · GitHub Pages</footer></main><script src="wiki.js"></script></body>'''
     return shell("Personal Knowledge Wiki", "style.css", body)
 
 
