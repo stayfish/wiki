@@ -1,9 +1,9 @@
 # AI Knowledge Wiki
 
-一个由 AI 协助维护、由人审核、发布到 GitHub Pages 的静态知识库。
+一个通过人与 Agent 对话积累阅读笔记、由人审核并发布到 GitHub Pages 的静态知识库。
 
 ```text
-原始资料 -> raw/ -> AI 整理 -> wiki/ -> 构建器 -> GitHub Pages
+阅读材料 -> 与 Agent 讨论 -> raw/ + wiki/ -> 人工审核 -> GitHub Pages
 ```
 
 ## 环境
@@ -22,7 +22,7 @@ uv sync
 - `wiki/`：Markdown 知识页，是内容的唯一真实来源。
 - `render.py`：静态网站构建器。
 - `assets/`：全站样式与滚动动画。
-- `SCHEMA.md`：AI 必须遵循的内容结构与工作流。
+- `schema/`：阅读对话工作流、内容契约和各类页面模板。
 - `AGENTS.md`：仓库规则，以及供没有对话上下文的 Agent 使用的完整操作手册。
 - `index.md`：给人和 AI 使用的知识地图。
 - `log.md`：ingest、query、lint 操作记录。
@@ -30,7 +30,47 @@ uv sync
 
 ## 使用
 
-如果要让另一个 Agent 接手，直接让它先阅读 [`AGENTS.md`](./AGENTS.md)，再给出来源或具体任务。
+如果要让一个 Agent 接手，直接让它先阅读 [`AGENTS.md`](./AGENTS.md)，再用自然语言给出材料或问题。
+
+## 通过对话做阅读笔记
+
+默认采用“先读和讨论，再确认写入”的方式：
+
+```text
+阅读这篇论文，先和我讨论，不要写入 Wiki：<路径或 URL>
+```
+
+Agent 会说明实际阅读范围，给出核心问题、3–5 个要点、证据、局限以及与现有笔记的关系。你可以继续追问或指定重点，然后说：
+
+```text
+按“方法为什么有效”这个重点，把刚才的讨论写入 Wiki。
+```
+
+如果不需要中间确认，可以直接说：
+
+```text
+直接把这篇文章加入 Wiki，完整阅读，提炼可复用概念，并保留反例和局限。
+```
+
+查询默认只回答、不修改文件：
+
+```text
+根据现有 Wiki 回答这个问题，先不要修改文件：<问题>
+```
+
+值得长期保留时再说：
+
+```text
+把刚才的答案沉淀到 Wiki，优先更新已有页面。
+```
+
+还可以要求 Agent 做阅读回顾：
+
+```text
+回顾最近五次阅读：哪些结论变强了，哪些仍有冲突，下一步该读什么？
+```
+
+完整规则见 [`schema/SCHEMA.md`](./schema/SCHEMA.md) 和 [`schema/conversation.md`](./schema/conversation.md)。
 
 检查内容：
 
