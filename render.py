@@ -180,14 +180,14 @@ def type_overview(pages: list[Page]) -> str:
     for kind, (english, chinese, description) in TYPE_META.items():
         count = sum(page.kind == kind for page in pages)
         blocks.append(
-            f'<a class="type-block" href="#type-{kind}">'
+            f'<a class="type-block" href="types/{kind}.html">'
             f'<strong>{count:02}</strong><span>{english} · {chinese}</span>'
             f'<small>{description}</small></a>'
         )
     return '<section class="type-overview" aria-label="按页面类型浏览">' + "".join(blocks) + "</section>"
 
 
-def recent_pages(pages: list[Page]) -> str:
+def page_rows(pages: list[Page], page_prefix: str = "") -> str:
     ordered = sorted(pages, key=lambda page: (page.updated, page.title), reverse=True)
     rows: list[str] = []
     for page in ordered:
@@ -203,45 +203,56 @@ def recent_pages(pages: list[Page]) -> str:
             '<div class="recent-preview">'
             f'<div><span class="eyebrow">{html.escape(page.kind)} · updated {html.escape(page.updated)}</span>'
             f'<h3>{html.escape(page.title)}</h3><p>{html.escape(page.summary)}</p></div>'
-            f'<a class="page-link" href="{page.url}">进入完整页面 <span aria-hidden="true">→</span></a>'
+            f'<a class="page-link" href="{page_prefix}{page.url}">进入完整页面 <span aria-hidden="true">→</span></a>'
             '</div></details>'
         )
     empty = '<p class="empty-state">还没有知识页面。添加第一份来源后，它会出现在这里。</p>'
-    content = "".join(rows) if rows else empty
+    return "".join(rows) if rows else empty
+
+
+def recent_pages(pages: list[Page]) -> str:
     return (
         '<section class="recent" aria-labelledby="recent-title">'
         '<div class="section-heading"><span class="section-number">§ 01</span>'
         '<div><span class="eyebrow">All pages · no pagination</span>'
-        '<h2 id="recent-title">最近更新 <em>Recent</em></h2></div></div>'
-        f'<div class="recent-list">{content}</div></section>'
+        '<h2 id="recent-title"><a href="recent.html">最近更新 <em>Recent</em></a></h2>'
+        '<a class="section-link" href="recent.html">浏览全部页面 →</a></div></div>'
+        f'<div class="recent-list">{page_rows(pages)}</div></section>'
     )
 
 
-def type_sections(pages: list[Page]) -> str:
-    groups: list[str] = []
-    for kind, (english, chinese, _) in TYPE_META.items():
-        items = sorted(
-            (page for page in pages if page.kind == kind),
-            key=lambda page: (page.updated, page.title),
-            reverse=True,
-        )
-        cards = "".join(
-            f'<a class="card" href="{page.url}"><span>{kind}</span>'
-            f'<h3>{html.escape(page.title)}</h3><p>{html.escape(page.summary)}</p>'
-            f'<small>{html.escape(page.updated)}</small></a>'
-            for page in items
-        )
-        empty = f'<p class="type-empty">暂无{chinese}页面</p>'
-        groups.append(
-            f'<section class="type-section" id="type-{kind}">'
-            f'<div class="rule"><span>{english} · {chinese}</span><span>{len(items):02}</span></div>'
-            f'<div class="grid">{cards or empty}</div></section>'
-        )
-    return "".join(groups)
+def listing_document(pages: list[Page], kind: str | None = None) -> str:
+    if kind is None:
+        title = "最近更新"
+        english = "Recent"
+        description = "全部知识页面，按更新时间倒序排列。"
+        selected = pages
+        css_path = "style.css"
+        script_path = "wiki.js"
+        home_path = "index.html"
+        page_prefix = ""
+    else:
+        english, chinese, description = TYPE_META[kind]
+        title = f"{english} · {chinese}"
+        selected = [page for page in pages if page.kind == kind]
+        css_path = "../style.css"
+        script_path = "../wiki.js"
+        home_path = "../index.html"
+        page_prefix = "../"
+    body = (
+        f'<body class="listing"><nav><a href="{home_path}">← Wiki Index</a>'
+        f'<span>{len(selected):02} pages</span></nav><main class="page">'
+        f'<header class="listing-hero"><span class="eyebrow">Browse · no pagination</span>'
+        f'<h1>{html.escape(title)}</h1><p>{html.escape(description)}</p></header>'
+        f'<div class="recent-list">{page_rows(selected, page_prefix)}</div>'
+        '<footer>Static HTML · GitHub Pages</footer></main>'
+        f'<script src="{script_path}"></script></body>'
+    )
+    return shell(f"{title} · Wiki", css_path, body)
 
 
 def index_document(pages: list[Page]) -> str:
-    body = f'''<body class="home"><main class="page"><header class="mast"><span>Personal Wiki</span><span>AI maintained · Human reviewed</span></header><div class="cover"><span class="eyebrow">Living notes · {len(pages):03} pages</span><h1>Knowledge,<br><em>kept in motion.</em></h1><p>原始资料负责追溯，Markdown 负责结构，AI 协助整理，人负责判断。</p></div>{type_overview(pages)}{recent_pages(pages)}{type_sections(pages)}<footer>Static HTML · GitHub Pages</footer></main><script src="wiki.js"></script></body>'''
+    body = f'''<body class="home"><main class="page"><header class="mast"><span>Personal Wiki</span><span>AI maintained · Human reviewed</span></header><div class="cover"><span class="eyebrow">Living notes · {len(pages):03} pages</span><h1>Knowledge,<br><em>kept in motion.</em></h1><p>原始资料负责追溯，Markdown 负责结构，AI 协助整理，人负责判断。</p></div>{type_overview(pages)}{recent_pages(pages)}<footer>Static HTML · GitHub Pages</footer></main><script src="wiki.js"></script></body>'''
     return shell("Personal Knowledge Wiki", "style.css", body)
 
 
@@ -252,6 +263,11 @@ def write_site(pages: list[Page]) -> None:
     shutil.copy2(ROOT / "assets/wiki.js", OUTPUT_ROOT / "wiki.js")
     page_map = {page.slug: page for page in pages}
     (OUTPUT_ROOT / "index.html").write_text(index_document(pages), encoding="utf-8")
+    (OUTPUT_ROOT / "recent.html").write_text(listing_document(pages), encoding="utf-8")
+    types_root = OUTPUT_ROOT / "types"
+    types_root.mkdir()
+    for kind in TYPE_META:
+        (types_root / f"{kind}.html").write_text(listing_document(pages, kind), encoding="utf-8")
     for page in pages:
         target = OUTPUT_ROOT / page.url; target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(page_document(page, pages, page_map), encoding="utf-8")
