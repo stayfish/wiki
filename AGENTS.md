@@ -1,5 +1,7 @@
 # AGENTS.md
 
+Before maintaining Wiki content, read `AGENT_PLAYBOOK.md`. It is the complete handoff guide for agents working without prior conversation context.
+
 ## Environment
 
 - Use `uv` for Python environment and dependency management.
