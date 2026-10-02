@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-10-02] ingest | Qwen2.5-Omni Technical Report 与 RoPE
+
+- 新增 Qwen2.5-Omni 来源指针和全文阅读笔记；实际依据为官方 arXiv v1 HTML 全文，本地 PDF 未复制或公开路径。
+- 围绕 Thinker–Talker、音视频输入、TMRoPE、两秒交错、流式语音、训练信号和证据边界整理对话结论。
+- 新增 RoPE 概念页，从二维旋转、相对位置恒等式、多频率实现讲到 M-RoPE/TMRoPE，并吸收 Qwen2-VL 相关章节与苏剑林文章对兼容性、等价性、对称性的分析。
+- 更新全模态架构阅读地图与 Qwen3.8-Omni 前代连接；保留 TMRoPE 消融不足、训练数据细节有限和多模态位置设计取舍等开放问题。
+
 ## [2026-09-29] ingest | Qwen3.8-Omni: Towards Native Omni-Modal Agents
 
 - 新增论文来源指针和全文阅读笔记；实际阅读范围为官方 arXiv v1 HTML 全文，本地附件未复制或公开路径。

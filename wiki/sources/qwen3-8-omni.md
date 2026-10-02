@@ -3,7 +3,7 @@ title: Qwen3.8-Omni：从全模态交互到原生全模态 Agent
 slug: qwen3-8-omni
 type: source
 summary: 理解 Qwen3.8-Omni 如何统一音视频输入、扩展长上下文，并借助工具与 Harness 完成长程任务。
-updated: 2026-09-29
+updated: 2026-10-02
 accent: brick
 source_kind: paper
 source_url: https://arxiv.org/abs/2609.25611
@@ -173,8 +173,10 @@ Agentic capability
 
 ## 与前代的关系
 
+[[qwen2-5-omni]] 提供 Thinker–Talker 与 TMRoPE 的架构基线；后续版本在其上继续扩展时间建模、空间音频、长上下文和 Agent 系统。
+
 ```text
-Qwen2.5-Omni：统一看、听、说，建立 Thinker–Talker
+Qwen2.5-Omni：统一看、听、说，建立 Thinker–Talker 与 TMRoPE
         ↓
 Qwen3.5-Omni：更长音视频、更精确时间对齐、更稳定语音
         ↓

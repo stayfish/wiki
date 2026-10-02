@@ -3,7 +3,7 @@ title: 全模态模型的统一路线与阅读地图
 slug: omni-model-architecture-paths
 type: topic
 summary: 比较共享 embedding、统一离散 token、专用编码器与 Thinker–Talker 等全模态架构路线。
-updated: 2026-09-29
+updated: 2026-10-02
 accent: ochre
 ---
 
@@ -15,7 +15,7 @@ accent: ochre
 
 ## 问题范围
 
-本页组织本轮讨论中形成的阅读地图。除 [[qwen3-8-omni]] 外，下列论文目前只核对了公开摘要和贡献说明，尚未完成全文阅读，因此这里记录的是阅读假设与比较框架，不是最终结论。
+本页组织全模态架构的阅读地图。[[qwen2-5-omni]] 与 [[qwen3-8-omni]] 已完成全文阅读；其他列出的论文目前只核对了公开摘要、贡献说明或相关章节，因此对应内容仍是阅读假设与比较框架。
 
 ## 主要路线
 
@@ -29,7 +29,7 @@ Unified-IO 2、AnyGPT 与 Chameleon 代表不同程度的统一离散序列路�
 
 ### 专用编码器接入语言骨干
 
-Qwen-Omni 使用 Vision Encoder、AuT 和 Spatial AuT 产生连续 embedding，经 adapter 投影进语言骨干。优点是可以继承强语言模型并为每种模态使用合适前端；缺点是输入输出不对称，图像和视频通常需要外部生成器。
+Qwen-Omni 使用 Vision Encoder 和音频编码器产生连续 embedding，经 adapter 投影进语言骨干。[[qwen2-5-omni]] 建立 Thinker–Talker，以 TMRoPE 对齐音视频并原生输出文字和语音；[[qwen3-8-omni]] 再加入 Spatial AuT。优点是可以继承强语言模型并为每种模态使用合适前端；缺点是输入输出不对称，图像和视频通常需要外部生成器。
 
 ### 长上下文全模态理解
 
@@ -37,7 +37,7 @@ Gemini 1.5 代表将音视频直接扩展到百万 token 上下文的路线。Qw
 
 ### Thinker–Talker 实时交互
 
-Qwen2.5-Omni 建立 Thinker–Talker：Thinker统一理解并产生文本与隐藏状态，Talker根据这些状态生成语音 codec token。Qwen3.5-Omni进一步处理长音视频、时间对齐和流式语音稳定性；Qwen3.8 在此基础上增加空间音频、长上下文和 Agent 系统。
+[[qwen2-5-omni|Qwen2.5-Omni]] 建立 Thinker–Talker：Thinker统一理解并产生文本与隐藏状态，Talker根据这些状态和采样文字生成语音 codec token；[[rotary-position-embedding|TMRoPE]] 为音频和视频提供共同时间坐标。Qwen3.5-Omni进一步处理长音视频、时间对齐和流式语音稳定性；Qwen3.8 在此基础上增加空间音频、长上下文和 Agent 系统。
 
 ## 比较与权衡
 
@@ -69,7 +69,7 @@ Qwen2.5-Omni 建立 Thinker–Talker：Thinker统一理解并产生文本与隐�
 2. Unified-IO 2：统一理解与生成；
 3. Chameleon 或 AnyGPT：统一离散序列的不同实现；
 4. Gemini 1.5：百万 token 多模态上下文；
-5. Qwen2.5-Omni：Thinker–Talker 与实时语音；
+5. [[qwen2-5-omni|Qwen2.5-Omni]]：已完成；Thinker–Talker、TMRoPE 与实时语音；
 6. Qwen3.5-Omni：长音视频、时间对齐和 ARIA；
 7. 回看 [[qwen3-8-omni]]，区分继承与新增部分。
 
@@ -78,6 +78,8 @@ Agent/Harness 支线依次阅读 ReAct、Toolformer、Reflexion、CodeAct、SWE-
 ## 来源与连接
 
 - [[qwen3-8-omni]]：当前已完成全文阅读的核心来源。
+- [[qwen2-5-omni]]：Thinker–Talker、TMRoPE 与流式语音的前代架构来源。
+- [[rotary-position-embedding]]：解释多模态时间和空间坐标如何进入 Attention。
 - [[omni-agent-stack]]：把模态统一问题连接到 Agent 运行时。
 - ImageBind：https://arxiv.org/abs/2305.05665
 - Unified-IO 2：https://arxiv.org/abs/2312.17172

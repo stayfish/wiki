@@ -2,11 +2,13 @@
 
 ## Sources · 来源
 
+- [[qwen2-5-omni]] — 从 Thinker–Talker、TMRoPE 与流式处理理解 Qwen 全模态路线的基础架构。
 - [[qwen3-8-omni]] — 从语音与空间音频编码、长上下文训练到全模态 Agent 系统的完整阅读笔记。
 
 ## Concepts · 概念
 
 - [[omni-agent-stack]] — 区分策略模型、工具接口、Harness 与执行环境，解释完整 Agent 能力来自哪里。
+- [[rotary-position-embedding]] — 从旋转矩阵与注意力点积解释 RoPE、M-RoPE 和 TMRoPE。
 
 ## Topics · 综合
 
