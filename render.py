@@ -13,16 +13,17 @@ LOGGER = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent
 WIKI_ROOT = ROOT / "wiki"
 OUTPUT_ROOT = ROOT / "site"
-ALLOWED_TYPES = {"source", "concept", "topic", "thread"}
+ALLOWED_TYPES = {"glance", "deepnote", "concept", "topic", "thread"}
 ALLOWED_ACCENTS = {"brick", "ochre", "moss", "deep"}
 TYPE_META = {
-    "source": ("Sources", "来源", "论文、文章、视频与代码仓库的精读页"),
+    "glance": ("Glances", "速览", "完成价值判断的紧凑来源卡片"),
+    "deepnote": ("Deepnotes", "精读", "重建方法、证据与后续问题的深入笔记"),
     "concept": ("Concepts", "概念", "跨来源复用的概念与机制"),
     "topic": ("Topics", "综合", "连接多个来源的横向主题"),
     "thread": ("Threads", "线索", "持续追踪的问题与思考"),
 }
 WIKILINK = re.compile(r"\[\[([a-z0-9][a-z0-9-]*)(?:\|([^\]]+))?\]\]")
-INLINE = re.compile(r"(`[^`]+`|\*\*[^*]+\*|\[[^\]]+\]\([^)]+\)|\[\[[^\]]+\]\])")
+INLINE = re.compile(r"(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)|\[\[[^\]]+\]\])")
 
 
 class BuildError(RuntimeError):
@@ -42,7 +43,8 @@ class Page:
 
     @property
     def url(self) -> str:
-        return f"{self.kind}s/{self.slug}.html"
+        directory = "sources" if self.kind in {"glance", "deepnote"} else f"{self.kind}s"
+        return f"{directory}/{self.slug}.html"
 
 
 def parse_page(path: Path) -> Page:
@@ -123,8 +125,11 @@ def markdown_to_html(source: str, pages: dict[str, Page]) -> str:
     output: list[str] = []
     paragraph: list[str] = []
     bullets: list[str] = []
+    numbered: list[str] = []
+    code: list[str] = []
     raw: list[str] = []
     in_figure = False
+    in_code = False
 
     def flush() -> None:
         if paragraph:
@@ -133,9 +138,19 @@ def markdown_to_html(source: str, pages: dict[str, Page]) -> str:
         if bullets:
             output.append("<ul>" + "".join(f"<li>{item}</li>" for item in bullets) + "</ul>")
             bullets.clear()
+        if numbered:
+            output.append("<ol>" + "".join(f"<li>{item}</li>" for item in numbered) + "</ol>")
+            numbered.clear()
 
     for line in source.splitlines():
         stripped = line.strip()
+        if in_code:
+            if stripped.startswith("```"):
+                output.append(f"<pre><code>{html.escape(chr(10).join(code))}</code></pre>")
+                code.clear(); in_code = False
+            else:
+                code.append(line)
+            continue
         if in_figure:
             raw.append(line)
             if stripped == "</figure>":
@@ -143,6 +158,8 @@ def markdown_to_html(source: str, pages: dict[str, Page]) -> str:
             continue
         if stripped.startswith("<figure"):
             flush(); in_figure = True; raw.append(line); continue
+        if stripped.startswith("```"):
+            flush(); in_code = True; continue
         if not stripped:
             flush(); continue
         heading = re.match(r"^(#{1,3})\s+(.+)$", stripped)
@@ -153,17 +170,23 @@ def markdown_to_html(source: str, pages: dict[str, Page]) -> str:
             continue
         bullet = re.match(r"^-\s+(.+)$", stripped)
         if bullet:
-            if paragraph: flush()
+            if paragraph or numbered: flush()
             bullets.append(inline_markup(bullet.group(1), pages)); continue
+        number = re.match(r"^\d+\.\s+(.+)$", stripped)
+        if number:
+            if paragraph or bullets: flush()
+            numbered.append(inline_markup(number.group(1), pages)); continue
         paragraph.append(stripped)
     flush()
     if in_figure:
         raise BuildError("未闭合的 <figure>")
+    if in_code:
+        raise BuildError("未闭合的代码块")
     return "\n".join(output)
 
 
 def shell(title: str, css_path: str, body: str) -> str:
-    return f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=Newsreader:opsz,wght@6..72,300..700&family=Noto+Serif+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="{css_path}"></head>{body}</html>'''
+    return f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=Newsreader:opsz,wght@6..72,300..700&family=Noto+Serif+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="{css_path}"><script>MathJax={{tex:{{inlineMath:[['$','$']],displayMath:[['$$','$$']]}}}};</script><script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script></head>{body}</html>'''
 
 
 def page_document(page: Page, pages: list[Page], page_map: dict[str, Page]) -> str:

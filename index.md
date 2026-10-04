@@ -1,9 +1,13 @@
 # Wiki Index
 
-## Sources · 来源
+## Deepnotes · 深入阅读
 
 - [[qwen2-5-omni]] — 从 Thinker–Talker、TMRoPE 与流式处理理解 Qwen 全模态路线的基础架构。
 - [[qwen3-8-omni]] — 从语音与空间音频编码、长上下文训练到全模态 Agent 系统的完整阅读笔记。
+
+## Glances · 简单总结
+
+当前没有只保留为 glance 的来源。
 
 ## Concepts · 概念
 

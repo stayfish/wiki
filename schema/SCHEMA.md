@@ -21,7 +21,7 @@
 
 ## 页面类型与模板
 
-- `wiki/sources/`：单一来源的阅读笔记，遵循 [`source.md`](./source.md)；论文再应用 [`paper.md`](./paper.md) 的专门规则。
+- `wiki/sources/`：单一来源的阅读笔记。`glance` 是完成价值判断后的速览，遵循 [`glance.md`](./glance.md)；`deepnote` 是以全文证据为基础的深入阅读，遵循 [`deepnote.md`](./deepnote.md)。两者共同遵循 [`source.md`](./source.md)，论文还应用 [`paper.md`](./paper.md) 的取证规则。
 - `wiki/concepts/`：跨来源复用的机制或概念；遵循 [`concept.md`](./concept.md)。
 - `wiki/topics/`：多个来源形成的比较、综述或判断；遵循 [`topic.md`](./topic.md)。
 - `wiki/threads/`：尚未闭合、值得继续追踪的问题；遵循 [`thread.md`](./thread.md)。
@@ -34,7 +34,7 @@
 ---
 title: 页面标题
 slug: unique-kebab-case
-type: source
+type: deepnote
 summary: 一句可独立显示的摘要
 updated: 2026-09-28
 accent: moss
@@ -42,7 +42,7 @@ accent: moss
 ```
 
 - `slug`：唯一英文 kebab-case。
-- `type`：只能是 `source`、`concept`、`topic`、`thread`。
+- `type`：只能是 `glance`、`deepnote`、`concept`、`topic`、`thread`。旧的 `source` 类型不得用于新页面。
 - `summary`：说明读者为什么应该打开该页，不重复标题。
 - `updated`：实际发生内容变化的日期；不要因机械检查改日期。
 - `accent`：只能是 `brick`、`ochre`、`moss`、`deep`。
@@ -53,13 +53,21 @@ accent: moss
 ## 写作与证据规则
 
 - 先写问题、结论和直觉，再写机制与细节。
-- 将“来源明确陈述”“Agent 的综合或推断”“仍未知”分开表达。
+- 严格区分四类信息：论文原文明确声称的内容、相关文献中的已有结论、基于证据的合理推断、仍不确定的猜测。推断不能写成事实；猜测必须说明缺少什么证据。
 - 重要主张指回来源页；来源页注明 URL、本地文件、版本、访问日期和阅读范围。
 - 不编造引文、页码、代码位置、作者立场、实验数字或因果关系。
 - 摘要、解释、批评和用户观点不能伪装成来源原话。
 - 同一概念只有一个主页面；出现同义内容时更新或合并，不创建近似副本。
 - 有冲突时并列记录双方主张、证据和未决原因，不擅自取平均或抹平。
 - 链接要说明关系，例如“提供证据”“形成反例”“细化机制”，而不是堆砌“相关链接”。
+
+## 写作风格
+
+- 参考 Andrej Karpathy 与 Kaiming He 技术写作的清晰、直接和机制感，不模仿个人口癖。
+- 使用准确、细粒度的 claim；每句话尽量包含对象、条件、机制、证据或边界，删除泛泛评价。
+- 以流畅正文组织论证，只在并列关系确实更清楚时使用列表。少用破折号和引号，不用“不是……而是……”制造空洞对比。
+- 背景深度以 [`reader-profile.md`](../reader-profile.md) 为准。已知基础只需定位，论文特有的新机制仍需从直觉讲到形式化表达。
+- 公式只使用 Markdown 数学语法 `$...$` 与 `$$...$$`，变量首次出现时定义，并解释每一步推导服务于哪个机制判断。
 
 ## 写入门槛
 
