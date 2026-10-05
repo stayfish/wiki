@@ -1,5 +1,13 @@
 # Wiki Log
 
+## [2026-10-04] ingest | OmniVChat: Synthesizing, Benchmarking, and Training for Native Audio-Visual Dialogue
+
+- 新增 arXiv v2 来源指针与 48 页全文 deepnote，重建 OmniVChat 的任务定义、Single-turn / Multi-turn 数据生成、证据回标、tiered rubric 和 OmniVChat-RL 逐步训练机制。
+- 将 rubric score、组内回复效率、style reward、GSPO 序列级概率比和 LoRA 配置连接到主结果与奖励消融；保留完整奖励牺牲部分 correctness 以换取简洁度的权衡。
+- 新增跨模态 Grounding 归因线索，记录缺少单模态、ASR-text、模态错配、独立 judge 与人类盲评对照的问题；同步扩展全模态架构阅读地图的数据与评测轴。
+- 核对官方发布：合成 benchmark、媒体、scorer 与 reward 已公开；Studio、360 条人工录制集和论文多轮协议的前序 reference replies 尚未完整公开。
+- 未复制本地 PDF 或论文图像，未记录私人附件路径；后续研究检索截止 2026-10-04。
+
 ## [2026-10-04] lint | 强化方法总结的原文忠实度
 
 - 要求 glance 与 deepnote 先恢复论文的 problem setting / formulation、输入输出、符号、假设和原始流程，再增加直觉解释。

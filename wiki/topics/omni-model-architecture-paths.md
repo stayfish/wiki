@@ -2,8 +2,8 @@
 title: 全模态模型的统一路线与阅读地图
 slug: omni-model-architecture-paths
 type: topic
-summary: 比较共享 embedding、统一离散 token、专用编码器与 Thinker–Talker 等全模态架构路线。
-updated: 2026-10-02
+summary: 比较共享 embedding、统一离散 token、专用编码器、Thinker–Talker，以及与架构正交的数据和评测闭环。
+updated: 2026-10-04
 accent: ochre
 ---
 
@@ -11,11 +11,11 @@ accent: ochre
 
 ## 当前结论
 
-“全模态”没有唯一架构定义。当前重要路线分别统一语义空间、离散 token、Transformer 主干或交互接口；能理解所有模态不等于能原生生成所有模态，也不自动等于具备 Agent 能力。
+“全模态”没有唯一架构定义。当前重要路线分别统一语义空间、离散 token、Transformer 主干或交互接口；能理解所有模态不等于能原生生成所有模态，也不自动等于具备 Agent 能力。[[omnivchat]] 进一步表明，输入接口原生也不足以证明模型真正使用了音频和视频：训练数据、rubric、judge 与模态干预共同决定我们能否识别跨模态 grounding。
 
 ## 问题范围
 
-本页组织全模态架构的阅读地图。[[qwen2-5-omni]] 与 [[qwen3-8-omni]] 已完成全文阅读；其他列出的论文目前只核对了公开摘要、贡献说明或相关章节，因此对应内容仍是阅读假设与比较框架。
+本页组织全模态架构及其训练评测边界的阅读地图。[[qwen2-5-omni]]、[[qwen3-8-omni]] 与 [[omnivchat]] 已完成全文阅读；其他列出的论文目前只核对了公开摘要、贡献说明或相关章节，因此对应内容仍是阅读假设与比较框架。
 
 ## 主要路线
 
@@ -39,6 +39,10 @@ Gemini 1.5 代表将音视频直接扩展到百万 token 上下文的路线。Qw
 
 [[qwen2-5-omni|Qwen2.5-Omni]] 建立 Thinker–Talker：Thinker统一理解并产生文本与隐藏状态，Talker根据这些状态和采样文字生成语音 codec token；[[rotary-position-embedding|TMRoPE]] 为音频和视频提供共同时间坐标。Qwen3.5-Omni进一步处理长音视频、时间对齐和流式语音稳定性；Qwen3.8 在此基础上增加空间音频、长上下文和 Agent 系统。
 
+### 与架构正交的数据与评测闭环
+
+[[omnivchat]] 不提出新的 Omni 编码架构，而是在 Qwen3-Omni Thinker 上建立合成、证据回标、tiered rubric、LLM judge 和 GSPO 闭环。它揭示了另一条能力轴：模型可以拥有原生音视频输入，却仍可能主要依赖 ASR 内容、视觉捷径、类别模板或评分器偏好。判断架构是否带来真实联合感知，需要 audio-only、video-only、ASR-text、模态错配与独立 judge 对照，详见 [[omnivchat-grounding-attribution]]。
+
 ## 比较与权衡
 
 | 路线 | 统一对象 | 主要优势 | 主要限制 |
@@ -49,6 +53,7 @@ Gemini 1.5 代表将音视频直接扩展到百万 token 上下文的路线。Qw
 | Gemini 1.5 | 长上下文中的多模态信息 | 可处理超长音视频 | 装得下不等于推理或检索可靠 |
 | Qwen-Omni | 专用 Encoder + 共享 Thinker | 易继承语言推理和实时语音 | 视觉输出依赖外部工具 |
 | Omni Agent 栈 | 模型、工具与 Harness | 能主动取证并改变环境 | 贡献归因、成本和可靠性更复杂 |
+| OmniVChat 数据与 RL | 渲染事实、rubric 与回复策略 | 可规模化开放式音视频对话训练和评测 | 训练—评测耦合，grounding 归因不足 |
 
 ## 冲突与不确定性
 
@@ -56,6 +61,8 @@ Gemini 1.5 代表将音视频直接扩展到百万 token 上下文的路线。Qw
 - Any-to-any 原生生成形式更统一，但不保证每种模态的质量优于专业生成器。
 - 专用编码器路线虽然输出不对称，却可能更适合强理解模型和模块化产品系统。
 - 长上下文 benchmark 不能替代真实长视频中的证据定位、时序推理和成本评测。
+- 开放式 rubric 能容许多种正确措辞，但 criterion 遗漏、tier gate 和训练 judge 复用会把标注误差放大为系统性评分偏差。
+- 冻结音视频 tower 后的回复策略增益不能自动归因于更强感知；需要比较训练前后的模态干预敏感性。
 
 ## 我的判断
 
@@ -71,7 +78,8 @@ Gemini 1.5 代表将音视频直接扩展到百万 token 上下文的路线。Qw
 4. Gemini 1.5：百万 token 多模态上下文；
 5. [[qwen2-5-omni|Qwen2.5-Omni]]：已完成；Thinker–Talker、TMRoPE 与实时语音；
 6. Qwen3.5-Omni：长音视频、时间对齐和 ARIA；
-7. 回看 [[qwen3-8-omni]]，区分继承与新增部分。
+7. [[omnivchat]]：已完成；数据合成、分层 rubric、开放式评测与 GSPO 回复策略；
+8. 回看 [[qwen3-8-omni]]，区分继承与新增部分。
 
 Agent/Harness 支线依次阅读 ReAct、Toolformer、Reflexion、CodeAct、SWE-agent 和 OpenHands。
 
@@ -79,6 +87,8 @@ Agent/Harness 支线依次阅读 ReAct、Toolformer、Reflexion、CodeAct、SWE-
 
 - [[qwen3-8-omni]]：当前已完成全文阅读的核心来源。
 - [[qwen2-5-omni]]：Thinker–Talker、TMRoPE 与流式语音的前代架构来源。
+- [[omnivchat]]：把原生音视频输入连接到数据合成、开放式评分与回复策略优化。
+- [[omnivchat-grounding-attribution]]：记录架构能力与 rubric/judge 适配之间尚未解决的归因问题。
 - [[rotary-position-embedding]]：解释多模态时间和空间坐标如何进入 Attention。
 - [[omni-agent-stack]]：把模态统一问题连接到 Agent 运行时。
 - ImageBind：https://arxiv.org/abs/2305.05665
