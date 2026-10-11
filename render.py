@@ -24,6 +24,17 @@ TYPE_META = {
 }
 WIKILINK = re.compile(r"\[\[([a-z0-9][a-z0-9-]*)(?:\|([^\]]+))?\]\]")
 INLINE = re.compile(r"(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)|\[\[[^\]]+\]\])")
+IMAGE = re.compile(r'^!\[([^]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)$')
+SECTION_ROLES = (
+    ("reference", "Reference", ("来源", "wiki", "连接")),
+    ("frontier", "Frontier", ("复现", "后续", "follow-up", "研究响应", "下一步")),
+    ("contribution", "Contribution", ("贡献", "takeaway", "结论")),
+    ("critique", "Critique", ("局限", "假设", "反例", "质疑", "边界")),
+    ("evidence", "Evidence", ("实验", "证据", "验证", "结果", "论证")),
+    ("method", "Method", ("方法", "数学", "理论", "机制", "pipeline", "formulation")),
+    ("insight", "Insight", ("思路", "观察", "灵感", "猜想", "直觉", "idea")),
+    ("context", "Context", ("为什么读", "问题", "背景", "相关工作", "挑战", "缺口")),
+)
 
 
 class BuildError(RuntimeError):
@@ -94,6 +105,92 @@ def validate_links(pages: list[Page]) -> None:
         raise BuildError("无法解析的 Wiki 链接:\n  " + "\n  ".join(failures))
 
 
+def validate_assets(pages: list[Page]) -> None:
+    failures: list[str] = []
+    for page in pages:
+        for line in page.body.splitlines():
+            match = IMAGE.fullmatch(line.strip())
+            if not match:
+                continue
+            src = match.group(2)
+            if src.startswith(("http://", "https://", "data:")):
+                continue
+            target = (page.path.parent / src).resolve()
+            try:
+                target.relative_to(ROOT)
+            except ValueError:
+                failures.append(f"{page.path.relative_to(ROOT)} -> 路径越界: {src}")
+                continue
+            if not target.is_file():
+                failures.append(f"{page.path.relative_to(ROOT)} -> 缺少图片: {src}")
+    if failures:
+        raise BuildError("无法解析的图片资源:\n  " + "\n  ".join(failures))
+
+
+def heading_text(source: str) -> str:
+    source = WIKILINK.sub(lambda match: match.group(2) or match.group(1), source)
+    return re.sub(r"[`*_]", "", source).strip()
+
+
+def section_role(title: str) -> tuple[str, str]:
+    lowered = title.lower()
+    for role, label, keywords in SECTION_ROLES:
+        if any(keyword.lower() in lowered for keyword in keywords):
+            return role, label
+    return "note", "Reading Note"
+
+
+def reading_outline(source: str) -> list[dict[str, object]]:
+    outline: list[dict[str, object]] = []
+    in_code = False
+    section_number = 0
+    child_number = 0
+    for line in source.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
+        heading = re.match(r"^(#{2,3})\s+(.+)$", stripped)
+        if not heading:
+            continue
+        title = heading_text(heading.group(2))
+        if len(heading.group(1)) == 2:
+            section_number += 1
+            child_number = 0
+            role, label = section_role(title)
+            outline.append({"id": f"block-{section_number:02}", "title": title, "role": role, "label": label, "children": []})
+        elif outline:
+            child_number += 1
+            children = outline[-1]["children"]
+            assert isinstance(children, list)
+            children.append({"id": f"block-{section_number:02}-{child_number:02}", "title": title})
+    return outline
+
+
+def reading_map(source: str) -> str:
+    items: list[str] = []
+    for block in reading_outline(source):
+        children = block["children"]
+        child_html = ""
+        if isinstance(children, list) and children:
+            child_html = '<ol class="reading-map-children">' + "".join(
+                f'<li><a href="#{html.escape(str(child["id"]), quote=True)}">{html.escape(str(child["title"]))}</a></li>'
+                for child in children
+            ) + "</ol>"
+        items.append(
+            f'<li data-role="{html.escape(str(block["role"]), quote=True)}">'
+            f'<a href="#{html.escape(str(block["id"]), quote=True)}">'
+            f'<span>{html.escape(str(block["label"]))}</span>{html.escape(str(block["title"]))}</a>{child_html}</li>'
+        )
+    return (
+        '<aside class="reading-map" aria-label="分层阅读地图">'
+        '<span class="eyebrow">Reading map</span><h2>分层阅读地图</h2>'
+        '<ol class="reading-map-list">' + "".join(items) + "</ol></aside>"
+    )
+
+
 def inline_markup(text: str, pages: dict[str, Page]) -> str:
     result: list[str] = []
     cursor = 0
@@ -121,15 +218,19 @@ def inline_markup(text: str, pages: dict[str, Page]) -> str:
     return "".join(result)
 
 
-def markdown_to_html(source: str, pages: dict[str, Page]) -> str:
+def markdown_to_html(source: str, pages: dict[str, Page], card_sections: bool = False) -> str:
     output: list[str] = []
     paragraph: list[str] = []
     bullets: list[str] = []
     numbered: list[str] = []
+    table_rows: list[list[str]] = []
     code: list[str] = []
     raw: list[str] = []
     in_figure = False
     in_code = False
+    section_open = False
+    section_number = 0
+    child_number = 0
 
     def flush() -> None:
         if paragraph:
@@ -141,9 +242,25 @@ def markdown_to_html(source: str, pages: dict[str, Page]) -> str:
         if numbered:
             output.append("<ol>" + "".join(f"<li>{item}</li>" for item in numbered) + "</ol>")
             numbered.clear()
+        if table_rows:
+            if len(table_rows) >= 2 and all(re.fullmatch(r":?-{3,}:?", cell) for cell in table_rows[1]):
+                head = "<thead><tr>" + "".join(f"<th>{inline_markup(cell, pages)}</th>" for cell in table_rows[0]) + "</tr></thead>"
+                body_rows = table_rows[2:]
+            else:
+                head = ""
+                body_rows = table_rows
+            body = "<tbody>" + "".join(
+                "<tr>" + "".join(f"<td>{inline_markup(cell, pages)}</td>" for cell in row) + "</tr>"
+                for row in body_rows
+            ) + "</tbody>"
+            output.append(f'<div class="table-scroll"><table>{head}{body}</table></div>')
+            table_rows.clear()
 
     for line in source.splitlines():
         stripped = line.strip()
+        is_table_row = stripped.startswith("|") and stripped.endswith("|")
+        if table_rows and not is_table_row:
+            flush()
         if in_code:
             if stripped.startswith("```"):
                 output.append(f"<pre><code>{html.escape(chr(10).join(code))}</code></pre>")
@@ -162,10 +279,51 @@ def markdown_to_html(source: str, pages: dict[str, Page]) -> str:
             flush(); in_code = True; continue
         if not stripped:
             flush(); continue
+        if is_table_row:
+            if paragraph or bullets or numbered:
+                flush()
+            table_rows.append([cell.strip() for cell in stripped[1:-1].split("|")])
+            continue
+        image_match = IMAGE.fullmatch(stripped)
+        if image_match:
+            flush()
+            alt, src, title = image_match.groups()
+            if src.startswith("../../assets/papers/"):
+                src = "../paper-assets/" + src.removeprefix("../../assets/papers/")
+            caption = title or alt
+            output.append(
+                '<figure class="paper-figure">'
+                f'<img src="{html.escape(src, quote=True)}" alt="{html.escape(alt, quote=True)}" loading="lazy">'
+                f'<figcaption>{inline_markup(caption, pages)}</figcaption></figure>'
+            )
+            continue
         heading = re.match(r"^(#{1,3})\s+(.+)$", stripped)
         if heading:
             flush(); level = len(heading.group(1))
-            if level > 1:
+            if level == 2 and card_sections:
+                if section_open:
+                    output.append("</div></section>")
+                section_number += 1
+                child_number = 0
+                title = heading_text(heading.group(2))
+                role, label = section_role(title)
+                section_id = f"block-{section_number:02}"
+                output.append(
+                    f'<section class="note-card role-{role}" id="{section_id}" data-block-role="{role}">'
+                    '<header class="note-card-header">'
+                    f'<div><span class="block-kicker">Block {section_number:02} · {label}</span>'
+                    f'<h2>{inline_markup(heading.group(2), pages)}</h2></div>'
+                    '<div class="card-actions">'
+                    f'<button type="button" class="section-copy" data-copy-section="{section_id}" aria-label="复制本节链接">复制链接</button>'
+                    '<button type="button" class="section-toggle" aria-expanded="true" aria-label="折叠本节">收起</button>'
+                    '</div></header><div class="note-card-body">'
+                )
+                section_open = True
+            elif level == 3 and card_sections and section_open:
+                child_number += 1
+                child_id = f"block-{section_number:02}-{child_number:02}"
+                output.append(f'<h3 id="{child_id}">{inline_markup(heading.group(2), pages)}</h3>')
+            elif level > 1:
                 output.append(f"<h{level}>{inline_markup(heading.group(2), pages)}</h{level}>")
             continue
         bullet = re.match(r"^-\s+(.+)$", stripped)
@@ -182,6 +340,8 @@ def markdown_to_html(source: str, pages: dict[str, Page]) -> str:
         raise BuildError("未闭合的 <figure>")
     if in_code:
         raise BuildError("未闭合的代码块")
+    if section_open:
+        output.append("</div></section>")
     return "\n".join(output)
 
 
@@ -194,7 +354,26 @@ def page_document(page: Page, pages: list[Page], page_map: dict[str, Page]) -> s
     backlinks = ""
     if links:
         backlinks = '<aside><span class="eyebrow">引用此页</span><ul>' + "".join(f'<li><a href="../{item.url}">{html.escape(item.title)}</a></li>' for item in links) + "</ul></aside>"
-    body = f'''<body data-accent="{page.accent}"><nav><a href="../index.html">← Wiki Index</a><span>{page.kind} · {page.slug}</span></nav><main class="page"><header class="hero"><span class="eyebrow">{page.kind} · {page.updated}</span><h1>{html.escape(page.title)}</h1><p>{html.escape(page.summary)}</p></header><article>{markdown_to_html(page.body, page_map)}</article>{backlinks}<footer>AI maintained · Human reviewed</footer></main><script src="../wiki.js"></script></body>'''
+    is_deepnote = page.kind == "deepnote"
+    rendered = markdown_to_html(page.body, page_map, card_sections=is_deepnote)
+    if is_deepnote:
+        controls = (
+            '<div class="reading-toolbar" role="toolbar" aria-label="阅读控制">'
+            '<button type="button" data-reading-action="expand">全部展开</button>'
+            '<button type="button" data-reading-action="collapse">全部折叠</button>'
+            '<button type="button" data-reading-action="focus" aria-pressed="false">聚焦当前</button>'
+            '</div>'
+        )
+        content = f'{controls}<div class="reading-shell">{reading_map(page.body)}<article class="block-article">{rendered}</article></div>'
+        progress = '<div class="reading-progress" aria-hidden="true"><span></span></div>'
+        body_class = ' class="reading-page-body"'
+        main_class = "page reading-page"
+    else:
+        content = f'<article>{rendered}</article>'
+        progress = ""
+        body_class = ""
+        main_class = "page"
+    body = f'''<body{body_class} data-accent="{page.accent}"><nav><a href="../index.html">← Wiki Index</a><span>{page.kind} · {page.slug}</span></nav>{progress}<main class="{main_class}"><header class="hero"><span class="eyebrow">{page.kind} · {page.updated}</span><h1>{html.escape(page.title)}</h1><p>{html.escape(page.summary)}</p></header>{content}{backlinks}<footer>AI maintained · Human reviewed</footer></main><script src="../wiki.js"></script></body>'''
     return shell(f"{page.title} · Wiki", "../style.css", body)
 
 
@@ -284,6 +463,9 @@ def write_site(pages: list[Page]) -> None:
     OUTPUT_ROOT.mkdir()
     shutil.copy2(ROOT / "assets/style.css", OUTPUT_ROOT / "style.css")
     shutil.copy2(ROOT / "assets/wiki.js", OUTPUT_ROOT / "wiki.js")
+    paper_assets = ROOT / "assets/papers"
+    if paper_assets.exists():
+        shutil.copytree(paper_assets, OUTPUT_ROOT / "paper-assets")
     page_map = {page.slug: page for page in pages}
     (OUTPUT_ROOT / "index.html").write_text(index_document(pages), encoding="utf-8")
     (OUTPUT_ROOT / "recent.html").write_text(listing_document(pages), encoding="utf-8")
@@ -312,7 +494,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(); parser.add_argument("--check", action="store_true"); args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     try:
-        pages = load_pages(); validate_links(pages)
+        pages = load_pages(); validate_links(pages); validate_assets(pages)
         if not args.check: write_site(pages)
         LOGGER.info("Wiki: %s %d page(s)", "validated" if args.check else "rendered", len(pages))
         return 0

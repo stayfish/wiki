@@ -1,5 +1,13 @@
 # Wiki Log
 
+## [2026-10-10] lint | 将 deepnote 改为分块精读与交互式页面
+
+- 在深度判断后新增“分层阅读地图”阶段：先恢复问题背景、相关工作与挑战、观察与猜想、方法、实验论证、贡献和局限，再递归拆分复杂块。
+- 将精读讨论改为按块推进，默认在每个一级块后暂停；用户追问、纠偏和判断绑定回对应块。
+- 同步生成关键图表计划：截取许可允许再发布的方法图与结果，版权不明时改用带来源的重绘或 Markdown 表格重建。
+- 要求最终 deepnote 沿用讨论形成的 `## / ###` 层级，固定模板降为覆盖检查表。
+- 构建器根据内容层级生成语义卡片、嵌套阅读地图、阅读进度、折叠/展开、聚焦阅读和块链接复制；无 JavaScript 时保留完整正文。
+
 ## [2026-10-04] ingest | OmniVChat: Synthesizing, Benchmarking, and Training for Native Audio-Visual Dialogue
 
 - 新增 arXiv v2 来源指针与 48 页全文 deepnote，重建 OmniVChat 的任务定义、Single-turn / Multi-turn 数据生成、证据回标、tiered rubric 和 OmniVChat-RL 逐步训练机制。

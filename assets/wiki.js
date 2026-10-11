@@ -22,4 +22,93 @@
       });
     });
   });
+
+  const cards = [...document.querySelectorAll(".note-card")];
+  const mapLinks = [...document.querySelectorAll(".reading-map a[href^='#block-']")];
+  const focusButton = document.querySelector("[data-reading-action='focus']");
+  let activeCard = cards[0] || null;
+
+  const setCollapsed = (card, collapsed) => {
+    const toggle = card.querySelector(".section-toggle");
+    card.classList.toggle("is-collapsed", collapsed);
+    if (!toggle) return;
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+    toggle.textContent = collapsed ? "展开" : "收起";
+    toggle.setAttribute("aria-label", collapsed ? "展开本节" : "折叠本节");
+  };
+
+  cards.forEach((card) => {
+    card.querySelector(".section-toggle")?.addEventListener("click", () => {
+      setCollapsed(card, !card.classList.contains("is-collapsed"));
+    });
+    card.querySelector(".section-copy")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      const target = button.dataset.copySection;
+      const url = new URL(window.location.href);
+      url.hash = target;
+      try {
+        await navigator.clipboard.writeText(url.toString());
+        button.textContent = "已复制";
+        window.setTimeout(() => { button.textContent = "复制链接"; }, 1200);
+      } catch {
+        window.location.hash = target;
+      }
+    });
+  });
+
+  const setActiveCard = (card) => {
+    if (!card) return;
+    activeCard = card;
+    cards.forEach((item) => item.classList.toggle("is-focused", item === card));
+    mapLinks.forEach((link) => link.classList.toggle("is-active", link.hash === `#${card.id}`));
+  };
+
+  if (cards.length && "IntersectionObserver" in window) {
+    const cardObserver = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) setActiveCard(visible.target);
+    }, { rootMargin: "-18% 0px -58%", threshold: [0.05, 0.25, 0.5] });
+    cards.forEach((card) => cardObserver.observe(card));
+  }
+
+  mapLinks.forEach((link) => {
+    link.addEventListener("click", () => {
+      const parentBlock = link.hash.match(/^#block-\d+/);
+      const card = parentBlock ? document.querySelector(parentBlock[0]) : null;
+      if (card?.classList.contains("note-card")) {
+        setCollapsed(card, false);
+        setActiveCard(card);
+      }
+    });
+  });
+
+  document.querySelector("[data-reading-action='expand']")?.addEventListener("click", () => {
+    cards.forEach((card) => setCollapsed(card, false));
+  });
+  document.querySelector("[data-reading-action='collapse']")?.addEventListener("click", () => {
+    cards.forEach((card) => setCollapsed(card, true));
+  });
+  focusButton?.addEventListener("click", () => {
+    const enabled = !document.body.classList.contains("focus-reading");
+    document.body.classList.toggle("focus-reading", enabled);
+    focusButton.setAttribute("aria-pressed", String(enabled));
+    focusButton.textContent = enabled ? "退出聚焦" : "聚焦当前";
+    setActiveCard(activeCard);
+  });
+
+  const progress = document.querySelector(".reading-progress span");
+  const article = document.querySelector(".block-article");
+  if (progress && article) {
+    const updateProgress = () => {
+      const start = article.offsetTop;
+      const distance = Math.max(article.offsetHeight - window.innerHeight * 0.55, 1);
+      const value = Math.min(1, Math.max(0, (window.scrollY - start + window.innerHeight * 0.3) / distance));
+      progress.style.transform = `scaleX(${value})`;
+    };
+    updateProgress();
+    document.addEventListener("scroll", updateProgress, { passive: true });
+    window.addEventListener("resize", updateProgress);
+  }
 })();
