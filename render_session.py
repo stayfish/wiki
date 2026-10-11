@@ -91,25 +91,27 @@ def parse_session(path: Path) -> Session:
 
 
 def session_switcher(current: Session, sessions: list[Session]) -> str:
-    others = sorted(
-        (item for item in sessions if item.slug != current.slug),
+    ordered = sorted(
+        sessions,
         key=lambda item: (item.updated, item.created, item.slug),
         reverse=True,
     )
+    active_attrs = {current.slug: ' class="is-active" aria-current="page"'}
     items = "".join(
         '<li>'
-        f'<a href="../{html.escape(item.slug, quote=True)}/index.html">'
+        f'<a href="../{html.escape(item.slug, quote=True)}/index.html"'
+        f'{active_attrs.get(item.slug, "")}>'
         f'<span class="session-switcher-title">{html.escape(item.title)}</span>'
-        f'<span class="session-switcher-meta">{html.escape(item.updated)} · {item.turn_count} 轮</span>'
+        f'<span class="session-switcher-meta">{html.escape(item.updated)} · {item.turn_count * 2} 条消息</span>'
         '</a></li>'
-        for item in others
+        for item in ordered
     )
     if not items:
         items = '<li class="session-switcher-empty">暂无其他对话</li>'
     return (
-        '<aside class="session-list-panel" id="session-list-panel" aria-label="其他对话">'
-        '<div class="panel-heading"><div><span class="eyebrow">Sessions</span><h2>其他对话</h2></div>'
-        '<button type="button" class="panel-close" data-panel-close="sessions" aria-label="关闭其他对话">×</button></div>'
+        '<aside class="session-list-panel" id="session-list-panel" aria-label="研究会话">'
+        '<div class="panel-heading"><div><span class="eyebrow">Sessions</span><h2>研究会话</h2></div>'
+        '<button type="button" class="panel-close" data-panel-close="sessions" aria-label="关闭研究会话">×</button></div>'
         f'<nav class="session-switcher"><ul>{items}</ul>'
         '<a class="session-switcher-all" href="../index.html">查看全部 Session <span aria-hidden="true">→</span></a>'
         '</nav></aside>'
@@ -126,7 +128,7 @@ def session_document(session: Session, sessions: list[Session]) -> str:
         {},
         card_sections=True,
         paper_asset_prefix=None,
-        section_role_override=("session", "Conversation Turn"),
+        section_role_override=("session", "Turn"),
         block_ids=block_ids,
     )
     controls = (
@@ -137,7 +139,12 @@ def session_document(session: Session, sessions: list[Session]) -> str:
         '</div>'
     )
     source = "未绑定公开来源" if session.source == "none" else session.source
-    map_html = reading_map(session.body, ("session", "Conversation Turn"), block_ids=block_ids)
+    map_html = reading_map(session.body, ("session", "Turn"), block_ids=block_ids)
+    map_html = (
+        map_html.replace('aria-label="分层阅读地图"', 'aria-label="对话大纲"')
+        .replace('<span class="eyebrow">Reading map</span><h2>论文结构</h2>', '<span class="eyebrow">Outline</span><h2>对话大纲</h2>')
+        .replace('aria-label="关闭论文结构"', 'aria-label="关闭对话大纲"')
+    )
     switcher_html = session_switcher(session, sessions)
     research_panel = (
         '<aside class="research-panel" id="research-panel" aria-label="讨论信息">'
@@ -155,15 +162,15 @@ def session_document(session: Session, sessions: list[Session]) -> str:
         '<span aria-hidden="true">R·</span> Local Session</a>'
         f'<span class="topbar-title">{html.escape(session.title)}</span><div class="workspace-actions">'
         '<button type="button" data-panel-toggle="sessions" aria-controls="session-list-panel" aria-expanded="false">对话</button>'
-        '<button type="button" data-panel-toggle="map" aria-controls="reading-map" aria-expanded="false">目录</button>'
+        '<button type="button" data-panel-toggle="map" aria-controls="reading-map" aria-expanded="false">大纲</button>'
         '<button type="button" data-panel-toggle="research" aria-controls="research-panel" aria-expanded="false">讨论信息</button></div></nav>'
         '<div class="reading-progress" aria-hidden="true"><span></span></div>'
         '<main class="page reading-page">'
         '<header class="hero"><span class="eyebrow">Session · private workspace</span>'
         f'<h1>{html.escape(session.title)}</h1>'
         f'<p>{html.escape(source)}</p></header>'
-        f'<div class="reading-shell">{switcher_html}{map_html}'
-        f'<article class="block-article">{rendered}</article>{research_panel}</div>'
+        f'<div class="reading-shell">{switcher_html}'
+        f'<article class="block-article">{rendered}</article>{map_html}{research_panel}</div>'
         '<footer>Local session · Compile to Wiki only on explicit request</footer>'
         '</main><div class="panel-scrim" data-panel-scrim hidden></div><script src="../../assets/wiki.js"></script></body>'
     )
@@ -194,21 +201,17 @@ def dashboard_document(sessions: list[Session]) -> str:
 
     cards: list[str] = []
     for session in ordered:
-        source_state = "未绑定来源" if session.source == "none" else "已绑定来源"
         cards.append(
             '<article class="session-summary">'
-            '<div class="session-summary-head">'
-            f'<span class="session-status status-{session.status}">{STATUS_LABELS[session.status]}</span>'
+            f'<a href="{html.escape(session.slug, quote=True)}/index.html">'
+            '<div class="session-summary-main">'
+            f'<h2>{html.escape(session.title)}</h2>'
+            f'<p class="session-latest">{html.escape(session.latest_topic)}</p></div>'
+            '<div class="session-summary-meta">'
             f'<time datetime="{html.escape(session.updated, quote=True)}">{html.escape(session.updated)}</time>'
-            '</div>'
-            f'<h2><a href="{html.escape(session.slug, quote=True)}/index.html">{html.escape(session.title)}</a></h2>'
-            f'<p class="session-latest">最近：{html.escape(session.latest_topic)}</p>'
-            '<dl class="session-metrics">'
-            f'<div><dt>轮次</dt><dd>{session.turn_count:02}</dd></div>'
-            f'<div><dt>创建</dt><dd>{html.escape(session.created)}</dd></div>'
-            f'<div><dt>来源</dt><dd>{source_state}</dd></div>'
-            '</dl>'
-            f'<a class="session-open" href="{html.escape(session.slug, quote=True)}/index.html">继续阅读 <span aria-hidden="true">→</span></a>'
+            f'<span>{session.turn_count * 2} 条消息</span>'
+            f'<span class="session-status status-{session.status}">{STATUS_LABELS[session.status]}</span>'
+            '<span class="session-row-arrow" aria-hidden="true">→</span></div></a>'
             '</article>'
         )
 

@@ -76,13 +76,19 @@
     });
     [...card.querySelectorAll("h3")].forEach((heading) => {
       heading.dataset.headingTitle = heading.textContent;
-      const toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "detail-toggle"; toggle.textContent = "收起细节"; toggle.setAttribute("aria-expanded", "true");
+      const isTranscriptGroup = document.body.classList.contains("session-page") && ["用户", "Codex"].includes(heading.dataset.headingTitle);
+      const toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "detail-toggle"; toggle.textContent = isTranscriptGroup ? "展开内容" : "收起细节"; toggle.setAttribute("aria-expanded", String(!isTranscriptGroup));
+      const setDetailCollapsed = (collapsed) => {
+        toggle.setAttribute("aria-expanded", String(!collapsed));
+        toggle.textContent = collapsed ? (isTranscriptGroup ? "展开内容" : "展开细节") : (isTranscriptGroup ? "收起内容" : "收起细节");
+        let sibling = heading.nextElementSibling; while (sibling && sibling.tagName !== "H3") { sibling.hidden = collapsed; sibling = sibling.nextElementSibling; }
+      };
       toggle.addEventListener("click", () => {
         const collapsed = toggle.getAttribute("aria-expanded") === "true";
-        toggle.setAttribute("aria-expanded", String(!collapsed)); toggle.textContent = collapsed ? "展开细节" : "收起细节";
-        let sibling = heading.nextElementSibling; while (sibling && sibling.tagName !== "H3") { sibling.hidden = collapsed; sibling = sibling.nextElementSibling; }
+        setDetailCollapsed(collapsed);
       });
       heading.append(toggle);
+      if (isTranscriptGroup) setDetailCollapsed(true);
     });
   });
 
