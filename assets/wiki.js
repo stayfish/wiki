@@ -74,6 +74,16 @@
         window.location.hash = target;
       }
     });
+    [...card.querySelectorAll("h3")].forEach((heading) => {
+      heading.dataset.headingTitle = heading.textContent;
+      const toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "detail-toggle"; toggle.textContent = "收起细节"; toggle.setAttribute("aria-expanded", "true");
+      toggle.addEventListener("click", () => {
+        const collapsed = toggle.getAttribute("aria-expanded") === "true";
+        toggle.setAttribute("aria-expanded", String(!collapsed)); toggle.textContent = collapsed ? "展开细节" : "收起细节";
+        let sibling = heading.nextElementSibling; while (sibling && sibling.tagName !== "H3") { sibling.hidden = collapsed; sibling = sibling.nextElementSibling; }
+      });
+      heading.append(toggle);
+    });
   });
 
   const setActiveCard = (card) => {
@@ -93,6 +103,15 @@
       if (visible) setActiveCard(visible.target);
     }, { rootMargin: "-18% 0px -58%", threshold: [0.05, 0.25, 0.5] });
     cards.forEach((card) => cardObserver.observe(card));
+    const headingTargets = mapLinks.map((link) => document.querySelector(link.hash)).filter(Boolean);
+    const headingObserver = new IntersectionObserver((entries) => {
+      const active = entries.filter((entry) => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (!active) return;
+      mapLinks.forEach((link) => link.classList.toggle("is-active", link.hash === `#${active.target.id}`));
+      active.target.closest(".note-card") && (activeCard = active.target.closest(".note-card"));
+      document.dispatchEvent(new CustomEvent("reading:active", { detail: { blockId: active.target.id } }));
+    }, { rootMargin: "-12% 0px -76%", threshold: 0 });
+    headingTargets.forEach((heading) => headingObserver.observe(heading));
   }
 
   mapLinks.forEach((link) => {
@@ -132,12 +151,15 @@
     research: document.querySelector("#research-panel"),
   };
   const scrim = document.querySelector("[data-panel-scrim]");
+  let panelTrigger = null;
   const closePanels = () => {
     Object.entries(panels).forEach(([name, panel]) => {
       panel?.classList.remove("is-open");
+      panel?.setAttribute("aria-modal", "false");
       document.querySelector(`[data-panel-toggle='${name}']`)?.setAttribute("aria-expanded", "false");
     });
     if (scrim) scrim.hidden = true;
+    panelTrigger?.focus(); panelTrigger = null;
   };
   const openPanel = (name) => {
     const panel = panels[name];
@@ -145,7 +167,9 @@
     const opening = !panel.classList.contains("is-open");
     closePanels();
     if (!opening) return;
+    panelTrigger = document.activeElement;
     panel.classList.add("is-open");
+    panel.setAttribute("aria-modal", "true");
     document.querySelector(`[data-panel-toggle='${name}']`)?.setAttribute("aria-expanded", "true");
     if (scrim) scrim.hidden = false;
     panel.querySelector(".panel-close")?.focus();
@@ -159,12 +183,27 @@
   scrim?.addEventListener("click", closePanels);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closePanels();
+    if (event.key === "Tab") {
+      const panel = Object.values(panels).find((item) => item?.classList.contains("is-open"));
+      if (!panel) return;
+      const focusable = [...panel.querySelectorAll("button,a,input,select,textarea,[tabindex]:not([tabindex='-1'])")].filter((item) => !item.hidden);
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
   });
   mapLinks.forEach((link) => link.addEventListener("click", () => {
     if (window.matchMedia("(max-width: 1099px)").matches) closePanels();
   }));
 
   const pageSlug = document.body.dataset.pageSlug;
+  const toast = document.querySelector(".toast");
+  const showToast = (message, error = false) => {
+    if (!toast) return;
+    toast.textContent = message; toast.hidden = false; toast.classList.toggle("is-error", error);
+    window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(() => { toast.hidden = true; }, 2600);
+  };
   const workspaceStore = {
     key: "research-workspace:v1",
     read() {
@@ -190,45 +229,52 @@
     const form = document.querySelector(".note-form");
     const blockSelect = form?.elements.block;
     const notesList = document.querySelector(".notes-list");
+    const notesSearch = document.querySelector("[data-notes-search]");
     const readingState = document.querySelector("[data-reading-state]");
     let pageData = workspaceStore.page(pageSlug);
+    pageData.notes ||= [];
     let editingId = null;
     const categoryLabels = { understanding: "个人理解", question: "研究问题", critique: "批判性分析", reproduction: "复现记录" };
 
-    cards.forEach((card) => {
+    mapLinks.forEach((link) => {
+      const target = document.querySelector(link.hash);
       const option = document.createElement("option");
-      option.value = card.id;
-      option.textContent = card.querySelector("h2")?.textContent || card.id;
+      option.value = target?.id || link.hash.slice(1);
+      option.textContent = target?.dataset.headingTitle || target?.querySelector("h2")?.textContent || target?.textContent || link.textContent;
       blockSelect?.append(option);
     });
     if (readingState) {
       readingState.value = pageData.readingState || "unread";
       readingState.addEventListener("change", () => {
         pageData.readingState = readingState.value;
-        workspaceStore.updatePage(pageSlug, pageData);
+        if (!workspaceStore.updatePage(pageSlug, pageData)) showToast("阅读状态保存失败，请导出数据后重试。", true);
       });
     }
 
     const renderNotes = () => {
       if (!notesList) return;
       notesList.replaceChildren();
-      if (!pageData.notes?.length) {
-        const empty = document.createElement("p"); empty.className = "notes-empty"; empty.textContent = "还没有笔记。"; notesList.append(empty); return;
+      const query = notesSearch?.value.trim().toLocaleLowerCase() || "";
+      const visibleNotes = pageData.notes.filter((note) => !query || note.content.toLocaleLowerCase().includes(query) || (categoryLabels[note.category] || "").includes(query));
+      if (!visibleNotes.length) {
+        const empty = document.createElement("p"); empty.className = "notes-empty"; empty.textContent = query ? "没有匹配的笔记。" : "还没有笔记。"; notesList.append(empty); return;
       }
-      pageData.notes.forEach((note) => {
+      visibleNotes.forEach((note) => {
         const item = document.createElement("article"); item.className = "saved-note";
         const meta = document.createElement("div"); meta.className = "saved-note-meta";
         const target = document.getElementById(note.blockId);
-        meta.textContent = `${categoryLabels[note.category] || note.category} · ${target?.querySelector("h2")?.textContent || note.blockId}`;
+        const targetLabel = target?.matches("h3") ? target.dataset.headingTitle : target?.querySelector("h2")?.textContent;
+        meta.textContent = `${categoryLabels[note.category] || note.category} · ${targetLabel || note.blockId}`;
         const content = document.createElement("p"); content.textContent = note.content;
         const actions = document.createElement("div"); actions.className = "saved-note-actions";
         const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "编辑";
         edit.addEventListener("click", () => { editingId = note.id; form.elements.category.value = note.category; form.elements.block.value = note.blockId; form.elements.content.value = note.content; form.elements.content.focus(); });
         const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "删除";
-        remove.addEventListener("click", () => { pageData.notes = pageData.notes.filter((value) => value.id !== note.id); workspaceStore.updatePage(pageSlug, pageData); renderNotes(); });
+        remove.addEventListener("click", () => { const previous = pageData.notes; pageData.notes = pageData.notes.filter((value) => value.id !== note.id); if (!workspaceStore.updatePage(pageSlug, pageData)) { pageData.notes = previous; showToast("删除失败，笔记仍已保留。", true); } renderNotes(); });
         actions.append(edit, remove); item.append(meta, content, actions); notesList.append(item);
       });
     };
+    notesSearch?.addEventListener("input", renderNotes);
 
     form?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -237,7 +283,8 @@
       const note = { id: editingId || (crypto.randomUUID?.() || `note-${Date.now()}`), category: form.elements.category.value, blockId: form.elements.block.value, content, updatedAt: new Date().toISOString() };
       const index = pageData.notes.findIndex((value) => value.id === note.id);
       if (index >= 0) pageData.notes[index] = note; else pageData.notes.push(note);
-      workspaceStore.updatePage(pageSlug, pageData); editingId = null; form.reset(); renderNotes();
+      if (!workspaceStore.updatePage(pageSlug, pageData)) { if (index < 0) pageData.notes.pop(); showToast("保存失败，输入内容已保留。请导出后重试。", true); return; }
+      editingId = null; form.reset(); renderNotes(); showToast("笔记已保存");
     });
     document.querySelector("[data-notes-export]")?.addEventListener("click", () => {
       const blob = new Blob([JSON.stringify({ version: 1, pageSlug, ...pageData }, null, 2)], { type: "application/json" });
@@ -249,8 +296,8 @@
         const imported = JSON.parse(await file.text());
         if (imported.version !== 1 || imported.pageSlug !== pageSlug || !Array.isArray(imported.notes)) throw new Error("invalid notes file");
         pageData = { readingState: imported.readingState || "unread", notes: imported.notes };
-        workspaceStore.updatePage(pageSlug, pageData); if (readingState) readingState.value = pageData.readingState; renderNotes();
-      } catch { window.alert("笔记文件格式或页面标识不匹配。"); }
+        if (!workspaceStore.updatePage(pageSlug, pageData)) throw new Error("storage unavailable"); if (readingState) readingState.value = pageData.readingState; renderNotes(); showToast("笔记已导入");
+      } catch { showToast("笔记文件无效、页面不匹配或无法保存。", true); }
       event.target.value = "";
     });
     renderNotes();
@@ -258,15 +305,18 @@
     let evidence = { claims: [] };
     try { evidence = JSON.parse(document.body.dataset.evidence || '{"claims":[]}'); } catch { evidence = { claims: [] }; }
     const evidenceList = document.querySelector(".evidence-list");
+    const statusLabels = { verified: "已核验", located: "候选位置", unverified: "尚未核对", unavailable: "来源不可用", conflict: "存在冲突" };
+    const claimLabels = { author: "作者陈述", experiment: "实验结果", analysis: "分析推断", user: "用户判断" };
     const renderEvidence = (blockId) => {
       if (!evidenceList) return;
       evidenceList.replaceChildren();
-      const claims = evidence.claims.filter((claim) => claim.block_id === blockId);
+      let claims = evidence.claims.filter((claim) => claim.block_id === blockId);
+      if (!claims.length) { const parentId = document.getElementById(blockId)?.closest(".note-card")?.id; claims = evidence.claims.filter((claim) => claim.block_id === parentId); }
       if (!claims.length) { const empty = document.createElement("p"); empty.textContent = "本节还没有结构化 claim。"; evidenceList.append(empty); return; }
       claims.forEach((claim) => {
         const item = document.createElement("article"); item.className = "evidence-item";
-        const badge = document.createElement("span"); badge.className = `evidence-status status-${claim.verification_status}`; badge.textContent = claim.verification_status;
-        const kind = document.createElement("span"); kind.className = "claim-type"; kind.textContent = claim.claim_type;
+        const badge = document.createElement("span"); badge.className = `evidence-status status-${claim.verification_status}`; badge.textContent = statusLabels[claim.verification_status] || claim.verification_status;
+        const kind = document.createElement("span"); kind.className = "claim-type"; kind.textContent = claimLabels[claim.claim_type] || claim.claim_type;
         const summary = document.createElement("p"); summary.textContent = claim.summary;
         item.append(badge, kind, summary);
         claim.anchors.forEach((anchor) => { const link = document.createElement("a"); link.href = anchor.source_url; link.target = "_blank"; link.rel = "noreferrer"; link.textContent = `${anchor.kind} · ${anchor.label}`; item.append(link); });
@@ -274,7 +324,120 @@
       });
     };
     renderEvidence(activeCard?.id);
-    cards.forEach((card) => new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) { if (blockSelect) blockSelect.value = card.id; renderEvidence(card.id); } }, { rootMargin: "-20% 0px -65%" }).observe(card));
+    document.addEventListener("reading:active", (event) => { if (blockSelect) blockSelect.value = event.detail.blockId; renderEvidence(event.detail.blockId); });
+  }
+
+  document.querySelectorAll("[data-panel-tab]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll("[data-panel-tab]").forEach((item) => item.setAttribute("aria-selected", String(item === tab)));
+      document.querySelectorAll("[data-panel-view]").forEach((view) => { view.hidden = view.dataset.panelView !== tab.dataset.panelTab; });
+    });
+  });
+
+  const modeButton = document.querySelector("[data-reading-mode]");
+  const setReadingMode = (overview) => {
+    document.body.classList.toggle("overview-mode", overview);
+    modeButton?.setAttribute("aria-pressed", String(overview));
+    if (modeButton) modeButton.textContent = overview ? "进入精读" : "概览";
+    try { window.localStorage.setItem(`reading-mode:${pageSlug}`, overview ? "overview" : "deep"); } catch {}
+  };
+  if (modeButton) {
+    setReadingMode(window.localStorage.getItem(`reading-mode:${pageSlug}`) === "overview");
+    modeButton.addEventListener("click", () => setReadingMode(!document.body.classList.contains("overview-mode")));
+  }
+
+  const openDialog = (dialog) => { if (dialog?.showModal) dialog.showModal(); else dialog?.setAttribute("open", ""); };
+  const searchDialog = document.querySelector("[data-search-dialog]");
+  const searchInput = document.querySelector("[data-page-search]");
+  const searchResults = document.querySelector(".search-results");
+  const searchStatus = document.querySelector(".search-status");
+  document.querySelector("[data-search-open]")?.addEventListener("click", () => { openDialog(searchDialog); searchInput?.focus(); });
+  const runSearch = () => {
+    if (!searchResults || !searchStatus) return;
+    searchResults.replaceChildren();
+    const query = searchInput.value.trim().toLocaleLowerCase();
+    if (!query) { searchStatus.textContent = ""; return; }
+    const matches = [];
+    document.querySelectorAll(".note-card h2,.note-card h3,.note-card p,.note-card li").forEach((node) => {
+      const text = node.textContent.trim(); const index = text.toLocaleLowerCase().indexOf(query);
+      if (index >= 0) matches.push({ node, text, index });
+    });
+    searchStatus.textContent = `找到 ${matches.length} 处结果`;
+    matches.slice(0, 80).forEach((match) => {
+      const button = document.createElement("button"); button.type = "button"; button.className = "search-result";
+      const heading = document.createElement("strong"); heading.textContent = match.node.closest(".note-card")?.querySelector("h2")?.textContent || "正文";
+      const excerpt = document.createElement("span"); excerpt.textContent = match.text.slice(Math.max(0, match.index - 36), match.index + query.length + 72); button.append(heading, excerpt);
+      button.addEventListener("click", () => { searchDialog.close(); match.node.closest(".note-card")?.classList.remove("is-collapsed"); match.node.scrollIntoView({ block: "center" }); match.node.classList.add("search-hit"); window.setTimeout(() => match.node.classList.remove("search-hit"), 1800); });
+      searchResults.append(button);
+    });
+  };
+  searchInput?.addEventListener("input", runSearch);
+
+  const preferencesDialog = document.querySelector("[data-preferences-dialog]");
+  const prefControls = { size: document.querySelector("[data-pref-size]"), leading: document.querySelector("[data-pref-leading]"), width: document.querySelector("[data-pref-width]"), sans: document.querySelector("[data-pref-sans]") };
+  const applyPreferences = (prefs) => {
+    document.documentElement.style.setProperty("--reader-size", `${prefs.size}px`);
+    document.documentElement.style.setProperty("--reader-leading", String(prefs.leading / 100));
+    document.documentElement.style.setProperty("--reader-width", `${prefs.width}px`);
+    document.body.classList.toggle("sans-reading", prefs.sans);
+    Object.entries(prefControls).forEach(([key, control]) => { if (control) key === "sans" ? control.checked = prefs[key] : control.value = prefs[key]; });
+  };
+  const defaultPrefs = { size: 18, leading: 182, width: 760, sans: false };
+  let prefs = defaultPrefs;
+  try { prefs = { ...defaultPrefs, ...JSON.parse(window.localStorage.getItem("reader-preferences:v1") || "{}") }; } catch {}
+  applyPreferences(prefs);
+  document.querySelector("[data-preferences-open]")?.addEventListener("click", () => openDialog(preferencesDialog));
+  Object.entries(prefControls).forEach(([key, control]) => control?.addEventListener("input", () => {
+    prefs = { size: Number(prefControls.size.value), leading: Number(prefControls.leading.value), width: Number(prefControls.width.value), sans: prefControls.sans.checked };
+    applyPreferences(prefs); try { window.localStorage.setItem("reader-preferences:v1", JSON.stringify(prefs)); } catch { showToast("阅读偏好无法保存。", true); }
+  }));
+  document.querySelector("[data-pref-reset]")?.addEventListener("click", () => { prefs = { ...defaultPrefs }; applyPreferences(prefs); try { window.localStorage.removeItem("reader-preferences:v1"); } catch {} });
+
+  const termPopover = document.querySelector("[data-term-popover]");
+  const termsList = document.querySelector(".terms-list");
+  document.querySelectorAll(".term-link").forEach((link) => {
+    if (termsList && !termsList.querySelector(`[href='${link.getAttribute("href")}']`)) { const item = link.cloneNode(true); item.textContent = `${link.dataset.termTitle} — ${link.dataset.termSummary}`; termsList.append(item); }
+    link.addEventListener("click", (event) => {
+      if (!termPopover) return;
+      event.preventDefault(); termPopover.replaceChildren();
+      const title = document.createElement("strong"); title.textContent = link.dataset.termTitle;
+      const summary = document.createElement("p"); summary.textContent = link.dataset.termSummary;
+      const full = document.createElement("a"); full.href = link.href; full.textContent = "打开完整概念页 →";
+      termPopover.append(title, summary, full); termPopover.hidden = false;
+      const rect = link.getBoundingClientRect(); termPopover.style.left = `${Math.min(rect.left, window.innerWidth - 340)}px`; termPopover.style.top = `${rect.bottom + 8}px`;
+    });
+  });
+  document.addEventListener("pointerdown", (event) => { if (termPopover && !termPopover.hidden && !termPopover.contains(event.target) && !event.target.closest?.(".term-link")) termPopover.hidden = true; });
+
+  const selectionTools = document.querySelector("[data-selection-tools]");
+  let selectedText = ""; let selectedBlock = "";
+  document.addEventListener("selectionchange", () => {
+    const selection = window.getSelection(); const text = selection?.toString().trim(); const node = selection?.anchorNode?.parentElement?.closest?.(".note-card");
+    if (!selectionTools || !text || !node || text.length > 1000) { if (selectionTools) selectionTools.hidden = true; return; }
+    selectedText = text; selectedBlock = node.id; const rect = selection.getRangeAt(0).getBoundingClientRect(); selectionTools.hidden = false; selectionTools.style.left = `${Math.max(8, rect.left)}px`; selectionTools.style.top = `${Math.max(64, rect.top - 46)}px`;
+  });
+  document.querySelector("[data-selection-copy]")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(selectedText); showToast("选文已复制"); } catch { showToast("复制失败", true); } selectionTools.hidden = true; });
+  document.querySelector("[data-selection-note]")?.addEventListener("click", () => {
+    const form = document.querySelector(".note-form"); if (!form) return;
+    document.querySelector("[data-panel-tab='notes']")?.click(); openPanel("research"); form.elements.block.value = selectedBlock; form.elements.content.value = `> ${selectedText}\n\n`; form.elements.content.focus(); selectionTools.hidden = true;
+  });
+
+  const decorateFormulas = () => document.querySelectorAll("mjx-container[display='true']").forEach((formula, index) => {
+    if (formula.parentElement?.classList.contains("formula-block")) return;
+    const wrapper = document.createElement("div"); wrapper.className = "formula-block"; wrapper.dataset.formula = String(index + 1); formula.before(wrapper); wrapper.append(formula);
+    const button = document.createElement("button"); button.type = "button"; button.textContent = "复制公式"; button.addEventListener("click", async () => { try { await navigator.clipboard.writeText(formula.textContent.trim()); button.textContent = "已复制"; window.setTimeout(() => button.textContent = "复制公式", 1200); } catch { showToast("公式复制失败", true); } }); wrapper.prepend(button);
+  });
+  if (window.MathJax?.startup?.promise) window.MathJax.startup.promise.then(decorateFormulas); else window.addEventListener("load", decorateFormulas);
+
+  const updateOnlineState = () => { const badge = document.querySelector(".offline-badge"); if (badge) badge.hidden = navigator.onLine; };
+  updateOnlineState(); window.addEventListener("online", updateOnlineState); window.addEventListener("offline", updateOnlineState);
+  document.addEventListener("keydown", (event) => { if (event.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "")) { event.preventDefault(); openDialog(searchDialog); searchInput?.focus(); } });
+
+  if (pageSlug) {
+    const positionKey = `reading-position:${pageSlug}`;
+    const savedPosition = Number(window.localStorage.getItem(positionKey) || 0);
+    if (!window.location.hash && savedPosition > 0) window.requestAnimationFrame(() => window.scrollTo({ top: savedPosition }));
+    let positionTimer; window.addEventListener("scroll", () => { window.clearTimeout(positionTimer); positionTimer = window.setTimeout(() => { try { window.localStorage.setItem(positionKey, String(window.scrollY)); } catch {} }, 180); }, { passive: true });
   }
 
   const progress = document.querySelector(".reading-progress span");

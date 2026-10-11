@@ -296,7 +296,8 @@ def inline_markup(text: str, pages: dict[str, Page]) -> str:
             assert link
             slug, label = link.groups()
             page = pages[slug]
-            result.append(f'<a href="../{page.url}">{html.escape(label or page.title)}</a>')
+            term_attrs = f' class="term-link" data-term-title="{html.escape(page.title, quote=True)}" data-term-summary="{html.escape(page.summary, quote=True)}"' if page.kind == "concept" else ""
+            result.append(f'<a href="../{page.url}"{term_attrs}>{html.escape(label or page.title)}</a>')
         elif token.startswith("`"):
             result.append(f"<code>{html.escape(token[1:-1])}</code>")
         elif token.startswith("**"):
@@ -473,23 +474,25 @@ def page_document(page: Page, pages: list[Page], page_map: dict[str, Page], evid
             '</div>'
         )
         research_panel = (
-            '<aside class="research-panel" id="research-panel" aria-label="研究面板">'
+            '<aside class="research-panel" id="research-panel" aria-label="研究面板" role="dialog" aria-modal="false">'
             '<div class="panel-heading"><div><span class="eyebrow">Workspace</span><h2>研究面板</h2></div>'
             '<button type="button" class="panel-close" data-panel-close="research" aria-label="关闭研究面板">×</button></div>'
-            '<section class="panel-section"><span class="panel-label">Document</span><h3>页面信息</h3>'
+            '<div class="panel-tabs" role="tablist" aria-label="研究工具"><button role="tab" aria-selected="true" data-panel-tab="evidence">证据</button><button role="tab" aria-selected="false" data-panel-tab="terms">术语</button><button role="tab" aria-selected="false" data-panel-tab="notes">笔记</button><button role="tab" aria-selected="false" data-panel-tab="info">设置</button></div>'
+            '<div data-panel-view="info" hidden><section class="panel-section"><span class="panel-label">Document</span><h3>页面信息</h3>'
             f'<dl><div><dt>类型</dt><dd>{html.escape(page.kind)}</dd></div><div><dt>更新</dt><dd>{html.escape(page.updated)}</dd></div>'
             f'<div><dt>章节</dt><dd>{len(reading_outline(page.body, page.slug, block_ids)):02}</dd></div>'
             f'<div><dt>证据条目</dt><dd>{len(evidence.claims) if evidence else 0:02}</dd></div></dl></section>'
             '<section class="panel-section"><span class="panel-label">Reading</span><h3>阅读控制</h3>'
             '<label class="reading-state-label">页面状态<select data-reading-state><option value="unread">未读</option><option value="reading">阅读中</option><option value="completed">已完成</option><option value="questioned">存疑</option></select></label>'
             '<p class="panel-note">阅读状态和笔记通过可替换存储层保存，不会自动写入公开 Wiki。</p>'
-            f'{controls}</section>{backlinks}'
-            '<section class="panel-section notes-panel"><span class="panel-label">Notes</span><h3>研究笔记</h3>'
+            f'{controls}</section>{backlinks}</div>'
+            '<div data-panel-view="notes" hidden><section class="panel-section notes-panel"><span class="panel-label">Notes</span><h3>研究笔记</h3>'
             '<form class="note-form"><label>类型<select name="category"><option value="understanding">个人理解</option><option value="question">研究问题</option><option value="critique">批判性分析</option><option value="reproduction">复现记录</option></select></label>'
             '<label>绑定位置<select name="block"></select></label><label>内容<textarea name="content" rows="5" placeholder="记录判断、疑问或复现结果"></textarea></label>'
-            '<div class="note-form-actions"><button type="submit">保存笔记</button><button type="button" data-notes-export>导出</button><label class="note-import">导入<input type="file" accept="application/json" data-notes-import></label></div></form><div class="notes-list" aria-live="polite"></div></section>'
-            '<section class="panel-section evidence-panel"><span class="panel-label">Evidence</span><h3>原文证据</h3>'
-            f'<p>{"sidecar 已连接；选择正文块查看关联 claim。" if evidence else "当前页面尚未提供 sidecar，来源与证据边界保留在正文中。"}</p><div class="evidence-list" aria-live="polite"></div></section>'
+            '<div class="note-form-actions"><button type="submit">保存笔记</button><button type="button" data-notes-export>导出</button><label class="note-import">导入<input type="file" accept="application/json" data-notes-import></label></div></form><div class="notes-search"><label>查找笔记<input type="search" data-notes-search></label></div><div class="notes-list" aria-live="polite"></div></section></div>'
+            '<div data-panel-view="evidence"><section class="panel-section evidence-panel"><span class="panel-label">Evidence</span><h3>原文证据</h3>'
+            f'<p>{"sidecar 已连接；选择正文块查看关联 claim。" if evidence else "当前页面尚未提供 sidecar，来源与证据边界保留在正文中。"}</p><div class="evidence-list" aria-live="polite"></div></section></div>'
+            '<div data-panel-view="terms" hidden><section class="panel-section"><span class="panel-label">Terminology</span><h3>本页术语</h3><p>点击正文中的概念链接查看解释。</p><div class="terms-list"></div></section></div>'
             '</aside>'
         )
         content = f'<div class="reading-shell">{reading_map(page.body, page_slug=page.slug, block_ids=block_ids)}<article class="block-article">{rendered}</article>{research_panel}</div>'
@@ -503,12 +506,18 @@ def page_document(page: Page, pages: list[Page], page_map: dict[str, Page], evid
         main_class = "page"
     workspace_actions = (
         '<div class="workspace-actions">'
+        '<button type="button" data-reading-mode aria-pressed="false">概览</button>'
+        '<button type="button" data-search-open aria-haspopup="dialog">搜索</button>'
+        '<button type="button" data-preferences-open aria-haspopup="dialog">偏好</button>'
         '<button type="button" data-panel-toggle="map" aria-controls="reading-map" aria-expanded="false">目录</button>'
         '<button type="button" data-panel-toggle="research" aria-controls="research-panel" aria-expanded="false">研究面板</button>'
         '</div>' if is_deepnote else ""
     )
     evidence_json = html.escape(json.dumps({"claims": evidence.claims if evidence else []}, ensure_ascii=False), quote=True)
-    body = f'''<body{body_class} data-accent="{page.accent}" data-page-slug="{page.slug}" data-evidence="{evidence_json}"><nav class="topbar"><a class="brand" href="../index.html"><span aria-hidden="true">R·</span> Research Wiki</a><span class="topbar-title">{html.escape(page.title)}</span>{workspace_actions}</nav>{progress}<main class="{main_class}"><header class="hero"><span class="eyebrow">{page.kind} · updated {page.updated}</span><h1>{html.escape(page.title)}</h1><p>{html.escape(page.summary)}</p></header>{content}{'' if is_deepnote else backlinks}<footer>AI maintained · Human reviewed</footer></main><div class="panel-scrim" data-panel-scrim hidden></div><script src="../wiki.js"></script></body>'''
+    utilities = ('<dialog class="workspace-dialog search-dialog" data-search-dialog><form method="dialog" class="dialog-heading"><h2>全文搜索</h2><button aria-label="关闭搜索">×</button></form><label>搜索当前论文<input type="search" data-page-search autocomplete="off" placeholder="输入关键词"></label><p class="search-status" aria-live="polite"></p><div class="search-results"></div></dialog>'
+        '<dialog class="workspace-dialog preferences-dialog" data-preferences-dialog><form method="dialog" class="dialog-heading"><h2>阅读偏好</h2><button aria-label="关闭偏好">×</button></form><label>正文字号<input type="range" min="16" max="22" value="18" data-pref-size></label><label>行距<input type="range" min="150" max="210" value="182" data-pref-leading></label><label>正文宽度<input type="range" min="640" max="880" value="760" data-pref-width></label><label><input type="checkbox" data-pref-sans> 使用无衬线正文</label><button type="button" data-pref-reset>恢复默认</button></dialog>'
+        '<div class="term-popover" data-term-popover hidden></div><div class="selection-tools" data-selection-tools hidden><button type="button" data-selection-note>添加笔记</button><button type="button" data-selection-copy>复制</button></div><div class="toast" role="status" aria-live="polite" hidden></div><div class="offline-badge" hidden>离线模式 · 正文可读，在线资源可能不可用</div>') if is_deepnote else ""
+    body = f'''<body{body_class} data-accent="{page.accent}" data-page-slug="{page.slug}" data-evidence="{evidence_json}"><nav class="topbar"><a class="brand" href="../index.html"><span aria-hidden="true">R·</span> Research Wiki</a><span class="topbar-title">{html.escape(page.title)}</span>{workspace_actions}</nav>{progress}<main class="{main_class}"><header class="hero"><span class="eyebrow">{page.kind} · updated {page.updated}</span><h1>{html.escape(page.title)}</h1><p>{html.escape(page.summary)}</p></header>{content}{'' if is_deepnote else backlinks}<footer>AI maintained · Human reviewed</footer></main><div class="panel-scrim" data-panel-scrim hidden></div>{utilities}<script src="../wiki.js"></script></body>'''
     return shell(f"{page.title} · Wiki", "../style.css", body)
 
 
