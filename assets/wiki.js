@@ -27,6 +27,24 @@
   const mapLinks = [...document.querySelectorAll(".reading-map a[href^='#block-']")];
   const focusButton = document.querySelector("[data-reading-action='focus']");
   let activeCard = cards[0] || null;
+  const stateKey = `reading-state:${window.location.pathname}`;
+  let savedState = {};
+  try {
+    savedState = JSON.parse(window.sessionStorage.getItem(stateKey) || "{}");
+  } catch {
+    savedState = {};
+  }
+
+  const saveState = () => {
+    try {
+      window.sessionStorage.setItem(stateKey, JSON.stringify({
+        collapsed: cards.filter((card) => card.classList.contains("is-collapsed")).map((card) => card.id),
+        focus: document.body.classList.contains("focus-reading"),
+      }));
+    } catch {
+      // Reading controls remain functional when storage is unavailable.
+    }
+  };
 
   const setCollapsed = (card, collapsed) => {
     const toggle = card.querySelector(".section-toggle");
@@ -35,9 +53,11 @@
     toggle.setAttribute("aria-expanded", String(!collapsed));
     toggle.textContent = collapsed ? "展开" : "收起";
     toggle.setAttribute("aria-label", collapsed ? "展开本节" : "折叠本节");
+    saveState();
   };
 
   cards.forEach((card) => {
+    if (savedState.collapsed?.includes(card.id)) setCollapsed(card, true);
     card.querySelector(".section-toggle")?.addEventListener("click", () => {
       setCollapsed(card, !card.classList.contains("is-collapsed"));
     });
@@ -61,6 +81,8 @@
     activeCard = card;
     cards.forEach((item) => item.classList.toggle("is-focused", item === card));
     mapLinks.forEach((link) => link.classList.toggle("is-active", link.hash === `#${card.id}`));
+    const activeLink = mapLinks.find((link) => link.hash === `#${card.id}`);
+    activeLink?.scrollIntoView({ block: "nearest" });
   };
 
   if (cards.length && "IntersectionObserver" in window) {
@@ -96,7 +118,51 @@
     focusButton.setAttribute("aria-pressed", String(enabled));
     focusButton.textContent = enabled ? "退出聚焦" : "聚焦当前";
     setActiveCard(activeCard);
+    saveState();
   });
+
+  if (savedState.focus && focusButton) {
+    document.body.classList.add("focus-reading");
+    focusButton.setAttribute("aria-pressed", "true");
+    focusButton.textContent = "退出聚焦";
+  }
+
+  const panels = {
+    map: document.querySelector("#reading-map"),
+    research: document.querySelector("#research-panel"),
+  };
+  const scrim = document.querySelector("[data-panel-scrim]");
+  const closePanels = () => {
+    Object.entries(panels).forEach(([name, panel]) => {
+      panel?.classList.remove("is-open");
+      document.querySelector(`[data-panel-toggle='${name}']`)?.setAttribute("aria-expanded", "false");
+    });
+    if (scrim) scrim.hidden = true;
+  };
+  const openPanel = (name) => {
+    const panel = panels[name];
+    if (!panel) return;
+    const opening = !panel.classList.contains("is-open");
+    closePanels();
+    if (!opening) return;
+    panel.classList.add("is-open");
+    document.querySelector(`[data-panel-toggle='${name}']`)?.setAttribute("aria-expanded", "true");
+    if (scrim) scrim.hidden = false;
+    panel.querySelector(".panel-close")?.focus();
+  };
+  document.querySelectorAll("[data-panel-toggle]").forEach((button) => {
+    button.addEventListener("click", () => openPanel(button.dataset.panelToggle));
+  });
+  document.querySelectorAll("[data-panel-close]").forEach((button) => {
+    button.addEventListener("click", closePanels);
+  });
+  scrim?.addEventListener("click", closePanels);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closePanels();
+  });
+  mapLinks.forEach((link) => link.addEventListener("click", () => {
+    if (window.matchMedia("(max-width: 1099px)").matches) closePanels();
+  }));
 
   const progress = document.querySelector(".reading-progress span");
   const article = document.querySelector(".block-article");

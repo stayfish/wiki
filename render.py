@@ -188,8 +188,9 @@ def reading_map(source: str, role_override: tuple[str, str] | None = None) -> st
             f'<span>{html.escape(str(block["label"]))}</span>{html.escape(str(block["title"]))}</a>{child_html}</li>'
         )
     return (
-        '<aside class="reading-map" aria-label="分层阅读地图">'
-        '<span class="eyebrow">Reading map</span><h2>分层阅读地图</h2>'
+        '<aside class="reading-map" id="reading-map" aria-label="分层阅读地图">'
+        '<div class="panel-heading"><div><span class="eyebrow">Reading map</span><h2>论文结构</h2></div>'
+        '<button type="button" class="panel-close" data-panel-close="map" aria-label="关闭论文结构">×</button></div>'
         '<ol class="reading-map-list">' + "".join(items) + "</ol></aside>"
     )
 
@@ -362,7 +363,7 @@ def page_document(page: Page, pages: list[Page], page_map: dict[str, Page]) -> s
     links = [item for item in pages if item.slug != page.slug and re.search(rf"\[\[{re.escape(page.slug)}(?:\||\]\])", item.body)]
     backlinks = ""
     if links:
-        backlinks = '<aside><span class="eyebrow">引用此页</span><ul>' + "".join(f'<li><a href="../{item.url}">{html.escape(item.title)}</a></li>' for item in links) + "</ul></aside>"
+        backlinks = '<section class="panel-section"><span class="panel-label">Wiki connections</span><h3>引用此页</h3><ul>' + "".join(f'<li><a href="../{item.url}">{html.escape(item.title)}</a></li>' for item in links) + "</ul></section>"
     is_deepnote = page.kind == "deepnote"
     rendered = markdown_to_html(page.body, page_map, card_sections=is_deepnote)
     if is_deepnote:
@@ -373,7 +374,21 @@ def page_document(page: Page, pages: list[Page], page_map: dict[str, Page]) -> s
             '<button type="button" data-reading-action="focus" aria-pressed="false">聚焦当前</button>'
             '</div>'
         )
-        content = f'{controls}<div class="reading-shell">{reading_map(page.body)}<article class="block-article">{rendered}</article></div>'
+        research_panel = (
+            '<aside class="research-panel" id="research-panel" aria-label="研究面板">'
+            '<div class="panel-heading"><div><span class="eyebrow">Workspace</span><h2>研究面板</h2></div>'
+            '<button type="button" class="panel-close" data-panel-close="research" aria-label="关闭研究面板">×</button></div>'
+            '<section class="panel-section"><span class="panel-label">Document</span><h3>页面信息</h3>'
+            f'<dl><div><dt>类型</dt><dd>{html.escape(page.kind)}</dd></div><div><dt>更新</dt><dd>{html.escape(page.updated)}</dd></div>'
+            f'<div><dt>章节</dt><dd>{len(reading_outline(page.body)):02}</dd></div></dl></section>'
+            '<section class="panel-section"><span class="panel-label">Reading</span><h3>阅读控制</h3>'
+            '<p class="panel-note">折叠状态仅保存在当前浏览器会话，不会修改 Wiki 内容。</p>'
+            f'{controls}</section>{backlinks}'
+            '<section class="panel-section panel-placeholder"><span class="panel-label">Evidence</span><h3>原文证据</h3>'
+            '<p>当前页面尚未提供结构化原文锚点。来源与证据边界保留在正文中。</p></section>'
+            '</aside>'
+        )
+        content = f'<div class="reading-shell">{reading_map(page.body)}<article class="block-article">{rendered}</article>{research_panel}</div>'
         progress = '<div class="reading-progress" aria-hidden="true"><span></span></div>'
         body_class = ' class="reading-page-body"'
         main_class = "page reading-page"
@@ -382,7 +397,13 @@ def page_document(page: Page, pages: list[Page], page_map: dict[str, Page]) -> s
         progress = ""
         body_class = ""
         main_class = "page"
-    body = f'''<body{body_class} data-accent="{page.accent}"><nav><a href="../index.html">← Wiki Index</a><span>{page.kind} · {page.slug}</span></nav>{progress}<main class="{main_class}"><header class="hero"><span class="eyebrow">{page.kind} · {page.updated}</span><h1>{html.escape(page.title)}</h1><p>{html.escape(page.summary)}</p></header>{content}{backlinks}<footer>AI maintained · Human reviewed</footer></main><script src="../wiki.js"></script></body>'''
+    workspace_actions = (
+        '<div class="workspace-actions">'
+        '<button type="button" data-panel-toggle="map" aria-controls="reading-map" aria-expanded="false">目录</button>'
+        '<button type="button" data-panel-toggle="research" aria-controls="research-panel" aria-expanded="false">研究面板</button>'
+        '</div>' if is_deepnote else ""
+    )
+    body = f'''<body{body_class} data-accent="{page.accent}"><nav class="topbar"><a class="brand" href="../index.html"><span aria-hidden="true">R·</span> Research Wiki</a><span class="topbar-title">{html.escape(page.title)}</span>{workspace_actions}</nav>{progress}<main class="{main_class}"><header class="hero"><span class="eyebrow">{page.kind} · updated {page.updated}</span><h1>{html.escape(page.title)}</h1><p>{html.escape(page.summary)}</p></header>{content}{'' if is_deepnote else backlinks}<footer>AI maintained · Human reviewed</footer></main><div class="panel-scrim" data-panel-scrim hidden></div><script src="../wiki.js"></script></body>'''
     return shell(f"{page.title} · Wiki", "../style.css", body)
 
 

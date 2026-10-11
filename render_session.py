@@ -91,19 +91,31 @@ def session_document(session: Session) -> str:
         '</div>'
     )
     source = "未绑定公开来源" if session.source == "none" else session.source
+    research_panel = (
+        '<aside class="research-panel" id="research-panel" aria-label="讨论信息">'
+        '<div class="panel-heading"><div><span class="eyebrow">Workspace</span><h2>讨论信息</h2></div>'
+        '<button type="button" class="panel-close" data-panel-close="research" aria-label="关闭讨论信息">×</button></div>'
+        '<section class="panel-section"><span class="panel-label">Session</span><h3>本地状态</h3><dl>'
+        f'<div><dt>状态</dt><dd>{html.escape(session.status)}</dd></div><div><dt>更新</dt><dd>{html.escape(session.updated)}</dd></div>'
+        '</dl></section><section class="panel-section"><span class="panel-label">Reading</span><h3>阅读控制</h3>'
+        f'{controls}</section><section class="panel-section panel-placeholder"><span class="panel-label">Privacy</span>'
+        '<h3>仅限本地</h3><p>本页不会自动写入或发布到 Wiki。</p></section></aside>'
+    )
     body = (
         '<body class="reading-page-body session-page" data-accent="deep">'
-        '<nav><span>Local reading session</span>'
-        f'<span>{html.escape(session.status)} · {html.escape(session.updated)}</span></nav>'
+        '<nav class="topbar"><span class="brand"><span aria-hidden="true">R·</span> Local Session</span>'
+        f'<span class="topbar-title">{html.escape(session.title)}</span><div class="workspace-actions">'
+        '<button type="button" data-panel-toggle="map" aria-controls="reading-map" aria-expanded="false">目录</button>'
+        '<button type="button" data-panel-toggle="research" aria-controls="research-panel" aria-expanded="false">讨论信息</button></div></nav>'
         '<div class="reading-progress" aria-hidden="true"><span></span></div>'
         '<main class="page reading-page">'
         '<header class="hero"><span class="eyebrow">Session · private workspace</span>'
         f'<h1>{html.escape(session.title)}</h1>'
-        f'<p>{html.escape(source)}</p></header>{controls}'
+        f'<p>{html.escape(source)}</p></header>'
         f'<div class="reading-shell">{reading_map(session.body, ("session", "Conversation Turn"))}'
-        f'<article class="block-article">{rendered}</article></div>'
+        f'<article class="block-article">{rendered}</article>{research_panel}</div>'
         '<footer>Local session · Compile to Wiki only on explicit request</footer>'
-        '</main><script src="../../assets/wiki.js"></script></body>'
+        '</main><div class="panel-scrim" data-panel-scrim hidden></div><script src="../../assets/wiki.js"></script></body>'
     )
     return shell(f"{session.title} · Session", "../../assets/style.css", body)
 
