@@ -76,12 +76,17 @@ def parse_session(path: Path) -> Session:
 
 
 def session_document(session: Session) -> str:
+    block_ids = {
+        f"Turn {number} · {title.strip()}": f"block-{number}"
+        for number, title in re.findall(r"^## Turn (\d{2})\s*·\s*(.+)$", session.body, flags=re.MULTILINE)
+    }
     rendered = markdown_to_html(
         session.body,
         {},
         card_sections=True,
         paper_asset_prefix=None,
         section_role_override=("session", "Conversation Turn"),
+        block_ids=block_ids,
     )
     controls = (
         '<div class="reading-toolbar" role="toolbar" aria-label="阅读控制">'
@@ -112,7 +117,7 @@ def session_document(session: Session) -> str:
         '<header class="hero"><span class="eyebrow">Session · private workspace</span>'
         f'<h1>{html.escape(session.title)}</h1>'
         f'<p>{html.escape(source)}</p></header>'
-        f'<div class="reading-shell">{reading_map(session.body, ("session", "Conversation Turn"))}'
+        f'<div class="reading-shell">{reading_map(session.body, ("session", "Conversation Turn"), block_ids=block_ids)}'
         f'<article class="block-article">{rendered}</article>{research_panel}</div>'
         '<footer>Local session · Compile to Wiki only on explicit request</footer>'
         '</main><div class="panel-scrim" data-panel-scrim hidden></div><script src="../../assets/wiki.js"></script></body>'
