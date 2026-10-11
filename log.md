@@ -1,5 +1,9 @@
 # Wiki Log
 
+## [2026-10-10] lint | 隐藏滚动条滑轨
+
+- 将页面及局部滚动区域的滑轨和角落设为透明，只保留细滑块与 Hover 反馈。
+
 ## [2026-10-10] lint | 引入证据 sidecar 与研究笔记层
 
 - 新增 `evidence/` sidecar 契约，为 deepnote 的二、三级内容块分配稳定 ID，并让构建器校验页面身份、ID 唯一性、claim 类型、核验状态与 block 引用。
