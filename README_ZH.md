@@ -22,7 +22,7 @@ uv sync
 - `sessions/`：本地阅读讨论页；一个主题包含多轮问答，默认忽略且不发布。
 - `wiki/`：Markdown 知识页，是内容的唯一真实来源。
 - `render.py`：静态网站构建器。
-- `render_session.py`：把单个 session 的 Markdown 渲染为本地静态页面。
+- `render_session.py`：把 session Markdown 渲染为本地静态页面，并生成全部 session 的本地总览。
 - `assets/`：全站样式与滚动动画。
 - `schema/`：阅读对话工作流、内容契约和各类页面模板。
 - `reader-profile.md`：只记录决定解释深度所需的读者背景。
@@ -80,6 +80,15 @@ Session 页面可手动重建：
 ```bash
 uv run python render_session.py sessions/<session-slug>/session.md
 ```
+
+不带路径会校验并重建全部 session，同时生成 `sessions/index.html` 总览页：
+
+```bash
+uv run python render_session.py
+python3 -m http.server 8765 --bind 127.0.0.1 --directory .
+```
+
+随后打开 <http://127.0.0.1:8765/sessions/>。总览和对话页都只在本地生成，不会进入公开站点。
 
 检查内容：
 

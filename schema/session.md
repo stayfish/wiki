@@ -8,12 +8,14 @@ Session 用于保存阅读过程，不属于公开 Wiki。一个 session 对应�
 sessions/<session-slug>/
 ├── session.md    # 完整讨论的规范来源
 └── index.html    # 每轮回答后重建的本地静态页面
+sessions/index.html  # 自动生成的本地总览，不提交
 ```
 
 - 不创建 `state.md` 或另一份滚动摘要。层次结构直接存在于每轮回答中。
 - 新论文、明显不同的研究问题或用户明确要求“新建 session”时创建新目录；普通追问继续当前 session。
 - `sessions/*/` 默认被 Git 忽略，避免公开聊天内容、本地来源线索或尚未审核的推断。
 - 每轮先把用户输入原文和 Agent 完整回答原文追加到 `session.md`，再运行 `render_session.py`。
+- 渲染单个 session 时同步刷新 `sessions/index.html`；不带路径运行渲染器时，校验并重建全部 session 和总览页。
 - 渲染成功后，Codex 对话区的最终回复只包含 `index.html` 的本地链接；完整回答只在 session 页面展示，避免两处重复。
 
 ## Frontmatter

@@ -4,6 +4,7 @@ import argparse
 import html
 import logging
 import re
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +14,11 @@ LOGGER = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent
 SESSIONS_ROOT = ROOT / "sessions"
 ALLOWED_STATUS = {"active", "ready-to-compile", "closed"}
+STATUS_LABELS = {
+    "active": "进行中",
+    "ready-to-compile": "待编译",
+    "closed": "已结束",
+}
 
 
 @dataclass(frozen=True)
@@ -25,6 +31,15 @@ class Session:
     status: str
     source: str
     body: str
+
+    @property
+    def turn_count(self) -> int:
+        return len(re.findall(r"^## Turn \d{2}\b", self.body, flags=re.MULTILINE))
+
+    @property
+    def latest_topic(self) -> str:
+        topics = re.findall(r"^## Turn \d{2}\s*·\s*(.+)$", self.body, flags=re.MULTILINE)
+        return topics[-1].strip() if topics else "未命名讨论"
 
 
 def parse_session(path: Path) -> Session:
@@ -125,20 +140,105 @@ def session_document(session: Session) -> str:
     return shell(f"{session.title} · Session", "../../assets/style.css", body)
 
 
+def discover_sessions() -> list[Path]:
+    return sorted(SESSIONS_ROOT.glob("*/session.md"))
+
+
+def dashboard_document(sessions: list[Session]) -> str:
+    ordered = sorted(sessions, key=lambda item: (item.updated, item.created, item.slug), reverse=True)
+    counts = Counter(session.status for session in ordered)
+    total = len(ordered)
+    total_turns = sum(session.turn_count for session in ordered)
+
+    distribution = "".join(
+        f'<span class="status-segment status-{status}" style="--segment:{counts[status]}" '
+        f'title="{STATUS_LABELS[status]}：{counts[status]}"></span>'
+        for status in ("active", "ready-to-compile", "closed")
+        if counts[status]
+    )
+    legend = "".join(
+        f'<li><span class="status-dot status-{status}"></span>{STATUS_LABELS[status]} '
+        f'<strong>{counts[status]}</strong></li>'
+        for status in ("active", "ready-to-compile", "closed")
+    )
+
+    cards: list[str] = []
+    for session in ordered:
+        source_state = "未绑定来源" if session.source == "none" else "已绑定来源"
+        cards.append(
+            '<article class="session-summary">'
+            '<div class="session-summary-head">'
+            f'<span class="session-status status-{session.status}">{STATUS_LABELS[session.status]}</span>'
+            f'<time datetime="{html.escape(session.updated, quote=True)}">{html.escape(session.updated)}</time>'
+            '</div>'
+            f'<h2><a href="{html.escape(session.slug, quote=True)}/index.html">{html.escape(session.title)}</a></h2>'
+            f'<p class="session-latest">最近：{html.escape(session.latest_topic)}</p>'
+            '<dl class="session-metrics">'
+            f'<div><dt>轮次</dt><dd>{session.turn_count:02}</dd></div>'
+            f'<div><dt>创建</dt><dd>{html.escape(session.created)}</dd></div>'
+            f'<div><dt>来源</dt><dd>{source_state}</dd></div>'
+            '</dl>'
+            f'<a class="session-open" href="{html.escape(session.slug, quote=True)}/index.html">继续阅读 <span aria-hidden="true">→</span></a>'
+            '</article>'
+        )
+
+    empty = (
+        '<section class="session-empty"><p>还没有本地 session。</p>'
+        '<code>uv run python render_session.py sessions/&lt;slug&gt;/session.md</code></section>'
+    )
+    body = (
+        '<body class="session-dashboard" data-accent="deep">'
+        '<nav class="topbar"><span class="brand"><span aria-hidden="true">R·</span> Local Sessions</span>'
+        '<span class="topbar-title">Private reading workspace</span></nav>'
+        '<main class="session-dashboard-page">'
+        '<header class="session-dashboard-hero"><span class="eyebrow">Private · local only</span>'
+        '<h1>阅读 Session</h1><p>从最近一次讨论继续，或检查哪些内容已经可以编译进 Wiki。</p></header>'
+        '<section class="session-overview" aria-label="Session 概览">'
+        f'<div class="overview-number"><strong>{total}</strong><span>Sessions</span></div>'
+        f'<div class="overview-number"><strong>{total_turns}</strong><span>Turns</span></div>'
+        '<div class="status-overview"><div class="status-bar" aria-label="状态分布">'
+        f'{distribution}</div><ul>{legend}</ul></div></section>'
+        f'<section class="session-grid" aria-label="全部 Session">{"".join(cards)}</section>'
+        f'{empty if not ordered else ""}'
+        '<footer>Generated from local session.md files · Nothing here is published automatically</footer>'
+        '</main></body>'
+    )
+    return shell("Local reading sessions", "../assets/style.css", body)
+
+
+def render_dashboard(sessions: list[Session]) -> Path:
+    target = SESSIONS_ROOT / "index.html"
+    target.write_text(dashboard_document(sessions), encoding="utf-8")
+    return target
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("source", type=Path)
+    parser.add_argument("source", nargs="?", type=Path)
+    parser.add_argument("--all", action="store_true", help="校验或重建全部 session")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
+    if args.source and args.all:
+        parser.error("source 与 --all 不能同时使用")
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     try:
-        session = parse_session(args.source)
+        paths = discover_sessions() if args.all or args.source is None else [args.source]
+        sessions = [parse_session(path) for path in paths]
         if args.check:
-            LOGGER.info("Session: validated %s", session.slug)
+            if len(sessions) == 1:
+                LOGGER.info("Session: validated %s", sessions[0].slug)
+            else:
+                LOGGER.info("Sessions: validated %d", len(sessions))
         else:
-            target = session.path.parent / "index.html"
-            target.write_text(session_document(session), encoding="utf-8")
-            LOGGER.info("Session: rendered %s", target.relative_to(ROOT))
+            for session in sessions:
+                target = session.path.parent / "index.html"
+                target.write_text(session_document(session), encoding="utf-8")
+                LOGGER.info("Session: rendered %s", target.relative_to(ROOT))
+            dashboard_sessions = sessions
+            if args.source is not None:
+                dashboard_sessions = [parse_session(path) for path in discover_sessions()]
+            dashboard = render_dashboard(dashboard_sessions)
+            LOGGER.info("Sessions: rendered dashboard %s", dashboard.relative_to(ROOT))
         return 0
     except (BuildError, OSError) as error:
         LOGGER.error("Session build failed: %s", error)

@@ -19,3 +19,4 @@ site/
 
 # Local conversation sessions (may contain private discussion)
 sessions/*/
+sessions/index.html
