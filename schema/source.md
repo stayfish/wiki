@@ -21,4 +21,6 @@ status: reviewed
 
 同一来源只能有一个主页面。以后决定深入时，保留 slug 和历史连接，原地将 `glance` 升级为 `deepnote`。降级通常没有必要；若证据后来被撤回，应保留修订说明。
 
+Deepnote 同时维护 `evidence/<slug>.json`。Markdown 负责可读论证，sidecar 负责稳定块 ID、claim 类型、核验状态和原文位置。`located` 不等于 `verified`；无法精确定位时不得补造页码或文本范围。
+
 按媒介调整“证据”：视频注明时间点，书章注明章节，代码仓库注明 commit 或 release，网页注明访问日期。无法取得全文时必须在 `read_scope` 和正文中说明，不得把二手摘要伪装成完整阅读。

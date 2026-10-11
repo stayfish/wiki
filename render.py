@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import hashlib
 import json
 import logging
 import re
@@ -13,6 +14,7 @@ LOGGER = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent
 WIKI_ROOT = ROOT / "wiki"
 OUTPUT_ROOT = ROOT / "site"
+EVIDENCE_ROOT = ROOT / "evidence"
 ALLOWED_TYPES = {"glance", "deepnote", "concept", "topic", "thread"}
 ALLOWED_ACCENTS = {"brick", "ochre", "moss", "deep"}
 TYPE_META = {
@@ -57,6 +59,91 @@ class Page:
     def url(self) -> str:
         directory = "sources" if self.kind in {"glance", "deepnote"} else f"{self.kind}s"
         return f"{directory}/{self.slug}.html"
+
+
+@dataclass(frozen=True)
+class Evidence:
+    page_slug: str
+    source_version: str
+    blocks: dict[str, str]
+    claims: list[dict[str, object]]
+
+
+def load_evidence(pages: list[Page]) -> dict[str, Evidence]:
+    evidence: dict[str, Evidence] = {}
+    known_pages = {page.slug: page for page in pages}
+    if not EVIDENCE_ROOT.exists():
+        return evidence
+    for path in sorted(EVIDENCE_ROOT.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise BuildError(f"{path.relative_to(ROOT)}: sidecar 无法解析: {error}") from error
+        slug = data.get("page_slug")
+        if data.get("version") != 1 or slug not in known_pages or path.stem != slug:
+            raise BuildError(f"{path.relative_to(ROOT)}: sidecar 身份或版本无效")
+        blocks, claims = data.get("blocks", {}), data.get("claims", [])
+        if not isinstance(blocks, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in blocks.items()):
+            raise BuildError(f"{path.relative_to(ROOT)}: blocks 必须是字符串映射")
+        block_ids = list(blocks.values())
+        if len(block_ids) != len(set(block_ids)) or not all(re.fullmatch(r"[a-z0-9][a-z0-9-]*", value) for value in block_ids):
+            raise BuildError(f"{path.relative_to(ROOT)}: block ID 必须唯一并使用 kebab-case")
+        expected_blocks = set(heading_keys(known_pages[str(slug)].body))
+        if set(blocks) != expected_blocks:
+            missing = sorted(expected_blocks - set(blocks))
+            stale = sorted(set(blocks) - expected_blocks)
+            raise BuildError(f"{path.relative_to(ROOT)}: blocks 与正文标题不一致; missing={missing}, stale={stale}")
+        if not isinstance(claims, list):
+            raise BuildError(f"{path.relative_to(ROOT)}: claims 必须是数组")
+        claim_ids: set[str] = set()
+        for claim in claims:
+            if not isinstance(claim, dict):
+                raise BuildError(f"{path.relative_to(ROOT)}: claim 必须是对象")
+            required = {"id", "block_id", "claim_type", "verification_status", "summary", "anchors"}
+            if required - claim.keys() or claim["id"] in claim_ids:
+                raise BuildError(f"{path.relative_to(ROOT)}: claim 字段缺失或 ID 重复")
+            claim_ids.add(str(claim["id"]))
+            if claim["block_id"] not in block_ids:
+                raise BuildError(f"{path.relative_to(ROOT)}: claim 指向未知 block: {claim['block_id']}")
+            if claim["claim_type"] not in {"author", "experiment", "analysis", "user"}:
+                raise BuildError(f"{path.relative_to(ROOT)}: 不支持 claim_type={claim['claim_type']}")
+            if claim["verification_status"] not in {"verified", "located", "unverified", "unavailable", "conflict"}:
+                raise BuildError(f"{path.relative_to(ROOT)}: 不支持 verification_status={claim['verification_status']}")
+            if not isinstance(claim["anchors"], list):
+                raise BuildError(f"{path.relative_to(ROOT)}: anchors 必须是数组")
+        evidence[str(slug)] = Evidence(str(slug), str(data.get("source_version", "unknown")), blocks, claims)
+    missing_sidecars = sorted(page.slug for page in pages if page.kind == "deepnote" and page.slug not in evidence)
+    if missing_sidecars:
+        raise BuildError(f"deepnote 缺少 evidence sidecar: {', '.join(missing_sidecars)}")
+    return evidence
+
+
+def fallback_block_id(page_slug: str, key: str) -> str:
+    digest = hashlib.sha256(f"{page_slug}:{key}".encode()).hexdigest()[:10]
+    return f"section-{digest}"
+
+
+def heading_keys(source: str) -> list[str]:
+    keys: list[str] = []
+    parent = ""
+    in_code = False
+    for line in source.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
+        heading = re.match(r"^(#{2,3})\s+(.+)$", stripped)
+        if not heading:
+            continue
+        title = heading_text(heading.group(2))
+        if len(heading.group(1)) == 2:
+            parent = title
+            keys.append(title)
+        elif parent:
+            keys.append(f"{parent} / {title}")
+    return keys
 
 
 def parse_page(path: Path) -> Page:
@@ -141,11 +228,12 @@ def section_role(title: str) -> tuple[str, str]:
     return "note", "Reading Note"
 
 
-def reading_outline(source: str) -> list[dict[str, object]]:
+def reading_outline(source: str, page_slug: str = "page", block_ids: dict[str, str] | None = None) -> list[dict[str, object]]:
     outline: list[dict[str, object]] = []
     in_code = False
     section_number = 0
     child_number = 0
+    parent_title = ""
     for line in source.splitlines():
         stripped = line.strip()
         if stripped.startswith("```"):
@@ -160,19 +248,21 @@ def reading_outline(source: str) -> list[dict[str, object]]:
         if len(heading.group(1)) == 2:
             section_number += 1
             child_number = 0
+            parent_title = title
             role, label = section_role(title)
-            outline.append({"id": f"block-{section_number:02}", "title": title, "role": role, "label": label, "children": []})
+            outline.append({"id": (block_ids or {}).get(title, fallback_block_id(page_slug, title)), "title": title, "role": role, "label": label, "children": []})
         elif outline:
             child_number += 1
             children = outline[-1]["children"]
             assert isinstance(children, list)
-            children.append({"id": f"block-{section_number:02}-{child_number:02}", "title": title})
+            key = f"{parent_title} / {title}"
+            children.append({"id": (block_ids or {}).get(key, fallback_block_id(page_slug, key)), "title": title})
     return outline
 
 
-def reading_map(source: str, role_override: tuple[str, str] | None = None) -> str:
+def reading_map(source: str, role_override: tuple[str, str] | None = None, page_slug: str = "page", block_ids: dict[str, str] | None = None) -> str:
     items: list[str] = []
-    for block in reading_outline(source):
+    for block in reading_outline(source, page_slug, block_ids):
         if role_override is not None:
             block["role"], block["label"] = role_override
         children = block["children"]
@@ -228,6 +318,8 @@ def markdown_to_html(
     card_sections: bool = False,
     paper_asset_prefix: str | None = "../paper-assets/",
     section_role_override: tuple[str, str] | None = None,
+    page_slug: str = "page",
+    block_ids: dict[str, str] | None = None,
 ) -> str:
     output: list[str] = []
     paragraph: list[str] = []
@@ -241,6 +333,7 @@ def markdown_to_html(
     section_open = False
     section_number = 0
     child_number = 0
+    parent_title = ""
 
     def flush() -> None:
         if paragraph:
@@ -316,8 +409,9 @@ def markdown_to_html(
                 section_number += 1
                 child_number = 0
                 title = heading_text(heading.group(2))
+                parent_title = title
                 role, label = section_role_override or section_role(title)
-                section_id = f"block-{section_number:02}"
+                section_id = (block_ids or {}).get(title, fallback_block_id(page_slug, title))
                 output.append(
                     f'<section class="note-card role-{role}" id="{section_id}" data-block-role="{role}">'
                     '<header class="note-card-header">'
@@ -331,7 +425,9 @@ def markdown_to_html(
                 section_open = True
             elif level == 3 and card_sections and section_open:
                 child_number += 1
-                child_id = f"block-{section_number:02}-{child_number:02}"
+                child_title = heading_text(heading.group(2))
+                key = f"{parent_title} / {child_title}"
+                child_id = (block_ids or {}).get(key, fallback_block_id(page_slug, key))
                 output.append(f'<h3 id="{child_id}">{inline_markup(heading.group(2), pages)}</h3>')
             elif level > 1:
                 output.append(f"<h{level}>{inline_markup(heading.group(2), pages)}</h{level}>")
@@ -359,13 +455,15 @@ def shell(title: str, css_path: str, body: str) -> str:
     return f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=Newsreader:opsz,wght@6..72,300..700&family=Noto+Serif+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="{css_path}"><script>MathJax={{tex:{{inlineMath:[['$','$']],displayMath:[['$$','$$']]}}}};</script><script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script></head>{body}</html>'''
 
 
-def page_document(page: Page, pages: list[Page], page_map: dict[str, Page]) -> str:
+def page_document(page: Page, pages: list[Page], page_map: dict[str, Page], evidence_map: dict[str, Evidence]) -> str:
     links = [item for item in pages if item.slug != page.slug and re.search(rf"\[\[{re.escape(page.slug)}(?:\||\]\])", item.body)]
     backlinks = ""
     if links:
         backlinks = '<section class="panel-section"><span class="panel-label">Wiki connections</span><h3>引用此页</h3><ul>' + "".join(f'<li><a href="../{item.url}">{html.escape(item.title)}</a></li>' for item in links) + "</ul></section>"
     is_deepnote = page.kind == "deepnote"
-    rendered = markdown_to_html(page.body, page_map, card_sections=is_deepnote)
+    evidence = evidence_map.get(page.slug)
+    block_ids = evidence.blocks if evidence else None
+    rendered = markdown_to_html(page.body, page_map, card_sections=is_deepnote, page_slug=page.slug, block_ids=block_ids)
     if is_deepnote:
         controls = (
             '<div class="reading-toolbar" role="toolbar" aria-label="阅读控制">'
@@ -380,15 +478,21 @@ def page_document(page: Page, pages: list[Page], page_map: dict[str, Page]) -> s
             '<button type="button" class="panel-close" data-panel-close="research" aria-label="关闭研究面板">×</button></div>'
             '<section class="panel-section"><span class="panel-label">Document</span><h3>页面信息</h3>'
             f'<dl><div><dt>类型</dt><dd>{html.escape(page.kind)}</dd></div><div><dt>更新</dt><dd>{html.escape(page.updated)}</dd></div>'
-            f'<div><dt>章节</dt><dd>{len(reading_outline(page.body)):02}</dd></div></dl></section>'
+            f'<div><dt>章节</dt><dd>{len(reading_outline(page.body, page.slug, block_ids)):02}</dd></div>'
+            f'<div><dt>证据条目</dt><dd>{len(evidence.claims) if evidence else 0:02}</dd></div></dl></section>'
             '<section class="panel-section"><span class="panel-label">Reading</span><h3>阅读控制</h3>'
-            '<p class="panel-note">折叠状态仅保存在当前浏览器会话，不会修改 Wiki 内容。</p>'
+            '<label class="reading-state-label">页面状态<select data-reading-state><option value="unread">未读</option><option value="reading">阅读中</option><option value="completed">已完成</option><option value="questioned">存疑</option></select></label>'
+            '<p class="panel-note">阅读状态和笔记通过可替换存储层保存，不会自动写入公开 Wiki。</p>'
             f'{controls}</section>{backlinks}'
-            '<section class="panel-section panel-placeholder"><span class="panel-label">Evidence</span><h3>原文证据</h3>'
-            '<p>当前页面尚未提供结构化原文锚点。来源与证据边界保留在正文中。</p></section>'
+            '<section class="panel-section notes-panel"><span class="panel-label">Notes</span><h3>研究笔记</h3>'
+            '<form class="note-form"><label>类型<select name="category"><option value="understanding">个人理解</option><option value="question">研究问题</option><option value="critique">批判性分析</option><option value="reproduction">复现记录</option></select></label>'
+            '<label>绑定位置<select name="block"></select></label><label>内容<textarea name="content" rows="5" placeholder="记录判断、疑问或复现结果"></textarea></label>'
+            '<div class="note-form-actions"><button type="submit">保存笔记</button><button type="button" data-notes-export>导出</button><label class="note-import">导入<input type="file" accept="application/json" data-notes-import></label></div></form><div class="notes-list" aria-live="polite"></div></section>'
+            '<section class="panel-section evidence-panel"><span class="panel-label">Evidence</span><h3>原文证据</h3>'
+            f'<p>{"sidecar 已连接；选择正文块查看关联 claim。" if evidence else "当前页面尚未提供 sidecar，来源与证据边界保留在正文中。"}</p><div class="evidence-list" aria-live="polite"></div></section>'
             '</aside>'
         )
-        content = f'<div class="reading-shell">{reading_map(page.body)}<article class="block-article">{rendered}</article>{research_panel}</div>'
+        content = f'<div class="reading-shell">{reading_map(page.body, page_slug=page.slug, block_ids=block_ids)}<article class="block-article">{rendered}</article>{research_panel}</div>'
         progress = '<div class="reading-progress" aria-hidden="true"><span></span></div>'
         body_class = ' class="reading-page-body"'
         main_class = "page reading-page"
@@ -403,7 +507,8 @@ def page_document(page: Page, pages: list[Page], page_map: dict[str, Page]) -> s
         '<button type="button" data-panel-toggle="research" aria-controls="research-panel" aria-expanded="false">研究面板</button>'
         '</div>' if is_deepnote else ""
     )
-    body = f'''<body{body_class} data-accent="{page.accent}"><nav class="topbar"><a class="brand" href="../index.html"><span aria-hidden="true">R·</span> Research Wiki</a><span class="topbar-title">{html.escape(page.title)}</span>{workspace_actions}</nav>{progress}<main class="{main_class}"><header class="hero"><span class="eyebrow">{page.kind} · updated {page.updated}</span><h1>{html.escape(page.title)}</h1><p>{html.escape(page.summary)}</p></header>{content}{'' if is_deepnote else backlinks}<footer>AI maintained · Human reviewed</footer></main><div class="panel-scrim" data-panel-scrim hidden></div><script src="../wiki.js"></script></body>'''
+    evidence_json = html.escape(json.dumps({"claims": evidence.claims if evidence else []}, ensure_ascii=False), quote=True)
+    body = f'''<body{body_class} data-accent="{page.accent}" data-page-slug="{page.slug}" data-evidence="{evidence_json}"><nav class="topbar"><a class="brand" href="../index.html"><span aria-hidden="true">R·</span> Research Wiki</a><span class="topbar-title">{html.escape(page.title)}</span>{workspace_actions}</nav>{progress}<main class="{main_class}"><header class="hero"><span class="eyebrow">{page.kind} · updated {page.updated}</span><h1>{html.escape(page.title)}</h1><p>{html.escape(page.summary)}</p></header>{content}{'' if is_deepnote else backlinks}<footer>AI maintained · Human reviewed</footer></main><div class="panel-scrim" data-panel-scrim hidden></div><script src="../wiki.js"></script></body>'''
     return shell(f"{page.title} · Wiki", "../style.css", body)
 
 
@@ -488,7 +593,7 @@ def index_document(pages: list[Page]) -> str:
     return shell("Personal Knowledge Wiki", "style.css", body)
 
 
-def write_site(pages: list[Page]) -> None:
+def write_site(pages: list[Page], evidence_map: dict[str, Evidence]) -> None:
     if OUTPUT_ROOT.exists(): shutil.rmtree(OUTPUT_ROOT)
     OUTPUT_ROOT.mkdir()
     shutil.copy2(ROOT / "assets/style.css", OUTPUT_ROOT / "style.css")
@@ -505,7 +610,7 @@ def write_site(pages: list[Page]) -> None:
         (types_root / f"{kind}.html").write_text(listing_document(pages, kind), encoding="utf-8")
     for page in pages:
         target = OUTPUT_ROOT / page.url; target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(page_document(page, pages, page_map), encoding="utf-8")
+        target.write_text(page_document(page, pages, page_map, evidence_map), encoding="utf-8")
     manifest = [
         {
             "title": page.title,
@@ -524,8 +629,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(); parser.add_argument("--check", action="store_true"); args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     try:
-        pages = load_pages(); validate_links(pages); validate_assets(pages)
-        if not args.check: write_site(pages)
+        pages = load_pages(); validate_links(pages); validate_assets(pages); evidence_map = load_evidence(pages)
+        if not args.check: write_site(pages, evidence_map)
         LOGGER.info("Wiki: %s %d page(s)", "validated" if args.check else "rendered", len(pages))
         return 0
     except BuildError as error:

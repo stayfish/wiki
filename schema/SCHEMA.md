@@ -18,6 +18,7 @@
 - `raw/`：来源文件或来源指针。保存后不可静默改写，是可追溯的事实底座。
 - `wiki/`：可读的 Markdown 知识页，由 Agent 创建和维护，人负责审核。
 - `schema/`：写作模板和对话工作流，由人与 Agent 共同调整。
+- `evidence/`：页面结构与证据 sidecar；保存稳定 block ID、claim 类型、核验状态和原文锚点，遵循 [`evidence.md`](./evidence.md)。
 
 `index.md` 是按内容组织的紧凑地图；`log.md` 是按时间追加的操作记录。两者用途不同，不能互相替代。
 
@@ -53,6 +54,8 @@ accent: moss
 - 内部链接：使用 `[[slug]]` 或 `[[slug|显示文字]]`，目标必须存在。
 
 模板可以要求额外元数据，但不得改变构建器所需字段。
+
+Deepnote 应建立同 slug 的 `evidence/<slug>.json`。构建器优先使用 sidecar 中的稳定 ID；正文改标题或重排时更新标题路径，但不得仅因顺序变化重建 ID。Claim 与来源锚点的字段和状态迁移遵循 [`evidence.md`](./evidence.md)。
 
 ## 写作与证据规则
 

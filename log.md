@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-10-10] lint | 引入证据 sidecar 与研究笔记层
+
+- 新增 `evidence/` sidecar 契约，为 deepnote 的二、三级内容块分配稳定 ID，并让构建器校验页面身份、ID 唯一性、claim 类型、核验状态与 block 引用。
+- Claim 区分作者陈述、实验、分析推断和用户观点；核验状态区分 verified、located、unverified、unavailable 与 conflict，located 不再被呈现为已经核验。
+- 研究面板新增阅读状态和章节绑定笔记，支持新增、编辑、删除及 JSON 导入导出；存储层可替换，当前静态部署不会把个人笔记自动写入公开 Wiki。
+- 为现有三篇 deepnote 建立首版稳定 block ID；Qwen3.8-Omni 加入三个用于验证界面与状态边界的结构化 claim。
+
 ## [2026-10-10] lint | 统一研究工作台滚动条
 
 - 页面、论文结构、研究面板、表格、代码和宽公式分别使用与纸张背景及语义强调色协调的细滚动条。

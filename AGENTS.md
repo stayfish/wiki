@@ -79,6 +79,7 @@ wiki/
 ├── log.md                     # 追加式操作时间线
 ├── reader-profile.md          # 读者背景与解释深度偏好
 ├── raw/                       # 不可变来源或来源指针
+├── evidence/                  # 稳定块 ID、claim 状态与来源锚点 sidecar
 ├── sessions/                  # 本地静态讨论页，默认被 Git 忽略
 ├── wiki/                      # Agent 维护的 Markdown 知识
 ├── render.py                  # 静态网站构建器
@@ -117,6 +118,7 @@ wiki/
 - 新页不能成为孤岛；必须进入 `index.md`，并至少说明它与其他页面的语义关系。知识库为空时，第一篇来源可暂时只连接它产生的真实概念或线索，不制造假链接。
 - 记录用户在对话中确认的关注点和判断，但明确标为用户观点，不能归因给作者。
 - deepnote 的最终标题层级沿用讨论时形成的分块逻辑。模板条目是覆盖检查表，不是必须机械照抄的固定目录。
+- deepnote 同步维护 `evidence/<slug>.json`：正文重排时保留稳定 block ID；claim 类型、核验状态和原文锚点遵循 `schema/evidence.md`。
 - 只有用户明确要求“写入 Wiki”“沉淀”或“入库”时，才从整个 session 综合 `glance` / `deepnote`，并按真实知识影响更新 `concepts`、`topics` 与 `threads`。不能把聊天逐字复制成公开页面。
 - 更新 `index.md`；向 `log.md` 追加规范化 `ingest` 条目。
 

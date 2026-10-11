@@ -24,7 +24,7 @@
   });
 
   const cards = [...document.querySelectorAll(".note-card")];
-  const mapLinks = [...document.querySelectorAll(".reading-map a[href^='#block-']")];
+  const mapLinks = [...document.querySelectorAll(".reading-map a[href^='#']")];
   const focusButton = document.querySelector("[data-reading-action='focus']");
   let activeCard = cards[0] || null;
   const stateKey = `reading-state:${window.location.pathname}`;
@@ -97,8 +97,8 @@
 
   mapLinks.forEach((link) => {
     link.addEventListener("click", () => {
-      const parentBlock = link.hash.match(/^#block-\d+/);
-      const card = parentBlock ? document.querySelector(parentBlock[0]) : null;
+      const target = document.querySelector(link.hash);
+      const card = target?.closest(".note-card");
       if (card?.classList.contains("note-card")) {
         setCollapsed(card, false);
         setActiveCard(card);
@@ -163,6 +163,119 @@
   mapLinks.forEach((link) => link.addEventListener("click", () => {
     if (window.matchMedia("(max-width: 1099px)").matches) closePanels();
   }));
+
+  const pageSlug = document.body.dataset.pageSlug;
+  const workspaceStore = {
+    key: "research-workspace:v1",
+    read() {
+      try { return JSON.parse(window.localStorage.getItem(this.key) || '{"version":1,"pages":{}}'); }
+      catch { return { version: 1, pages: {} }; }
+    },
+    write(data) {
+      try { window.localStorage.setItem(this.key, JSON.stringify(data)); return true; }
+      catch { return false; }
+    },
+    page(slug) {
+      const data = this.read();
+      return data.pages[slug] || { readingState: "unread", notes: [] };
+    },
+    updatePage(slug, value) {
+      const data = this.read();
+      data.pages[slug] = value;
+      return this.write(data);
+    },
+  };
+
+  if (pageSlug && cards.length) {
+    const form = document.querySelector(".note-form");
+    const blockSelect = form?.elements.block;
+    const notesList = document.querySelector(".notes-list");
+    const readingState = document.querySelector("[data-reading-state]");
+    let pageData = workspaceStore.page(pageSlug);
+    let editingId = null;
+    const categoryLabels = { understanding: "个人理解", question: "研究问题", critique: "批判性分析", reproduction: "复现记录" };
+
+    cards.forEach((card) => {
+      const option = document.createElement("option");
+      option.value = card.id;
+      option.textContent = card.querySelector("h2")?.textContent || card.id;
+      blockSelect?.append(option);
+    });
+    if (readingState) {
+      readingState.value = pageData.readingState || "unread";
+      readingState.addEventListener("change", () => {
+        pageData.readingState = readingState.value;
+        workspaceStore.updatePage(pageSlug, pageData);
+      });
+    }
+
+    const renderNotes = () => {
+      if (!notesList) return;
+      notesList.replaceChildren();
+      if (!pageData.notes?.length) {
+        const empty = document.createElement("p"); empty.className = "notes-empty"; empty.textContent = "还没有笔记。"; notesList.append(empty); return;
+      }
+      pageData.notes.forEach((note) => {
+        const item = document.createElement("article"); item.className = "saved-note";
+        const meta = document.createElement("div"); meta.className = "saved-note-meta";
+        const target = document.getElementById(note.blockId);
+        meta.textContent = `${categoryLabels[note.category] || note.category} · ${target?.querySelector("h2")?.textContent || note.blockId}`;
+        const content = document.createElement("p"); content.textContent = note.content;
+        const actions = document.createElement("div"); actions.className = "saved-note-actions";
+        const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "编辑";
+        edit.addEventListener("click", () => { editingId = note.id; form.elements.category.value = note.category; form.elements.block.value = note.blockId; form.elements.content.value = note.content; form.elements.content.focus(); });
+        const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "删除";
+        remove.addEventListener("click", () => { pageData.notes = pageData.notes.filter((value) => value.id !== note.id); workspaceStore.updatePage(pageSlug, pageData); renderNotes(); });
+        actions.append(edit, remove); item.append(meta, content, actions); notesList.append(item);
+      });
+    };
+
+    form?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const content = form.elements.content.value.trim();
+      if (!content) return;
+      const note = { id: editingId || (crypto.randomUUID?.() || `note-${Date.now()}`), category: form.elements.category.value, blockId: form.elements.block.value, content, updatedAt: new Date().toISOString() };
+      const index = pageData.notes.findIndex((value) => value.id === note.id);
+      if (index >= 0) pageData.notes[index] = note; else pageData.notes.push(note);
+      workspaceStore.updatePage(pageSlug, pageData); editingId = null; form.reset(); renderNotes();
+    });
+    document.querySelector("[data-notes-export]")?.addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify({ version: 1, pageSlug, ...pageData }, null, 2)], { type: "application/json" });
+      const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `${pageSlug}-notes.json`; link.click(); URL.revokeObjectURL(link.href);
+    });
+    document.querySelector("[data-notes-import]")?.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0]; if (!file) return;
+      try {
+        const imported = JSON.parse(await file.text());
+        if (imported.version !== 1 || imported.pageSlug !== pageSlug || !Array.isArray(imported.notes)) throw new Error("invalid notes file");
+        pageData = { readingState: imported.readingState || "unread", notes: imported.notes };
+        workspaceStore.updatePage(pageSlug, pageData); if (readingState) readingState.value = pageData.readingState; renderNotes();
+      } catch { window.alert("笔记文件格式或页面标识不匹配。"); }
+      event.target.value = "";
+    });
+    renderNotes();
+
+    let evidence = { claims: [] };
+    try { evidence = JSON.parse(document.body.dataset.evidence || '{"claims":[]}'); } catch { evidence = { claims: [] }; }
+    const evidenceList = document.querySelector(".evidence-list");
+    const renderEvidence = (blockId) => {
+      if (!evidenceList) return;
+      evidenceList.replaceChildren();
+      const claims = evidence.claims.filter((claim) => claim.block_id === blockId);
+      if (!claims.length) { const empty = document.createElement("p"); empty.textContent = "本节还没有结构化 claim。"; evidenceList.append(empty); return; }
+      claims.forEach((claim) => {
+        const item = document.createElement("article"); item.className = "evidence-item";
+        const badge = document.createElement("span"); badge.className = `evidence-status status-${claim.verification_status}`; badge.textContent = claim.verification_status;
+        const kind = document.createElement("span"); kind.className = "claim-type"; kind.textContent = claim.claim_type;
+        const summary = document.createElement("p"); summary.textContent = claim.summary;
+        item.append(badge, kind, summary);
+        claim.anchors.forEach((anchor) => { const link = document.createElement("a"); link.href = anchor.source_url; link.target = "_blank"; link.rel = "noreferrer"; link.textContent = `${anchor.kind} · ${anchor.label}`; item.append(link); });
+        evidenceList.append(item);
+      });
+    };
+    renderEvidence(activeCard?.id);
+    cards.forEach((card) => new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) { if (blockSelect) blockSelect.value = card.id; renderEvidence(card.id); } }, { rootMargin: "-20% 0px -65%" }).observe(card));
+  }
 
   const progress = document.querySelector(".reading-progress span");
   const article = document.querySelector(".block-article");
