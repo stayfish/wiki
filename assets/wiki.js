@@ -204,7 +204,7 @@
     toast.textContent = message; toast.hidden = false; toast.classList.toggle("is-error", error);
     window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(() => { toast.hidden = true; }, 2600);
   };
-  const workspaceStore = {
+  const localWorkspaceStore = {
     key: "research-workspace:v1",
     read() {
       try { return JSON.parse(window.localStorage.getItem(this.key) || '{"version":1,"pages":{}}'); }
@@ -231,7 +231,7 @@
     const notesList = document.querySelector(".notes-list");
     const notesSearch = document.querySelector("[data-notes-search]");
     const readingState = document.querySelector("[data-reading-state]");
-    let pageData = workspaceStore.page(pageSlug);
+    let pageData = localWorkspaceStore.page(pageSlug);
     pageData.notes ||= [];
     let editingId = null;
     const categoryLabels = { understanding: "个人理解", question: "研究问题", critique: "批判性分析", reproduction: "复现记录" };
@@ -247,7 +247,7 @@
       readingState.value = pageData.readingState || "unread";
       readingState.addEventListener("change", () => {
         pageData.readingState = readingState.value;
-        if (!workspaceStore.updatePage(pageSlug, pageData)) showToast("阅读状态保存失败，请导出数据后重试。", true);
+        if (!localWorkspaceStore.updatePage(pageSlug, pageData)) showToast("阅读状态保存失败，请导出数据后重试。", true);
       });
     }
 
@@ -270,7 +270,7 @@
         const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "编辑";
         edit.addEventListener("click", () => { editingId = note.id; form.elements.category.value = note.category; form.elements.block.value = note.blockId; form.elements.content.value = note.content; form.elements.content.focus(); });
         const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "删除";
-        remove.addEventListener("click", () => { const previous = pageData.notes; pageData.notes = pageData.notes.filter((value) => value.id !== note.id); if (!workspaceStore.updatePage(pageSlug, pageData)) { pageData.notes = previous; showToast("删除失败，笔记仍已保留。", true); } renderNotes(); });
+        remove.addEventListener("click", () => { const previous = pageData.notes; pageData.notes = pageData.notes.filter((value) => value.id !== note.id); if (!localWorkspaceStore.updatePage(pageSlug, pageData)) { pageData.notes = previous; showToast("删除失败，笔记仍已保留。", true); } renderNotes(); });
         actions.append(edit, remove); item.append(meta, content, actions); notesList.append(item);
       });
     };
@@ -283,7 +283,7 @@
       const note = { id: editingId || (crypto.randomUUID?.() || `note-${Date.now()}`), category: form.elements.category.value, blockId: form.elements.block.value, content, updatedAt: new Date().toISOString() };
       const index = pageData.notes.findIndex((value) => value.id === note.id);
       if (index >= 0) pageData.notes[index] = note; else pageData.notes.push(note);
-      if (!workspaceStore.updatePage(pageSlug, pageData)) { if (index < 0) pageData.notes.pop(); showToast("保存失败，输入内容已保留。请导出后重试。", true); return; }
+      if (!localWorkspaceStore.updatePage(pageSlug, pageData)) { if (index < 0) pageData.notes.pop(); showToast("保存失败，输入内容已保留。请导出后重试。", true); return; }
       editingId = null; form.reset(); renderNotes(); showToast("笔记已保存");
     });
     document.querySelector("[data-notes-export]")?.addEventListener("click", () => {
@@ -296,7 +296,7 @@
         const imported = JSON.parse(await file.text());
         if (imported.version !== 1 || imported.pageSlug !== pageSlug || !Array.isArray(imported.notes)) throw new Error("invalid notes file");
         pageData = { readingState: imported.readingState || "unread", notes: imported.notes };
-        if (!workspaceStore.updatePage(pageSlug, pageData)) throw new Error("storage unavailable"); if (readingState) readingState.value = pageData.readingState; renderNotes(); showToast("笔记已导入");
+        if (!localWorkspaceStore.updatePage(pageSlug, pageData)) throw new Error("storage unavailable"); if (readingState) readingState.value = pageData.readingState; renderNotes(); showToast("笔记已导入");
       } catch { showToast("笔记文件无效、页面不匹配或无法保存。", true); }
       event.target.value = "";
     });

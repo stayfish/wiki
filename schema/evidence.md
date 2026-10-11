@@ -57,4 +57,4 @@
 
 ## 私人工作区数据
 
-阅读状态和个人笔记不写入 evidence sidecar，也不自动进入公开 Wiki。前端使用版本化存储接口，数据至少包含 `pageSlug`、`readingState`、`notes`；笔记使用稳定 `blockId` 绑定章节。当前静态部署默认使用浏览器存储并支持 JSON 导入导出，未来同步服务必须保持同一数据模型与显式隐私边界。
+阅读状态和个人笔记不写入 evidence sidecar，也不自动进入公开 Wiki。静态前端使用版本化浏览器存储，数据至少包含 `pageSlug`、`readingState`、`notes`；笔记使用稳定 `blockId` 绑定章节。用户通过 JSON 导入导出在浏览器或设备间手动迁移，不连接账号、云同步或后端存储。

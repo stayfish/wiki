@@ -484,7 +484,7 @@ def page_document(page: Page, pages: list[Page], page_map: dict[str, Page], evid
             f'<div><dt>证据条目</dt><dd>{len(evidence.claims) if evidence else 0:02}</dd></div></dl></section>'
             '<section class="panel-section"><span class="panel-label">Reading</span><h3>阅读控制</h3>'
             '<label class="reading-state-label">页面状态<select data-reading-state><option value="unread">未读</option><option value="reading">阅读中</option><option value="completed">已完成</option><option value="questioned">存疑</option></select></label>'
-            '<p class="panel-note">阅读状态和笔记通过可替换存储层保存，不会自动写入公开 Wiki。</p>'
+            '<p class="panel-note">阅读状态和笔记仅保存在当前浏览器，可用 JSON 手动迁移；不会自动写入公开 Wiki。</p>'
             f'{controls}</section>{backlinks}</div>'
             '<div data-panel-view="notes" hidden><section class="panel-section notes-panel"><span class="panel-label">Notes</span><h3>研究笔记</h3>'
             '<form class="note-form"><label>类型<select name="category"><option value="understanding">个人理解</option><option value="question">研究问题</option><option value="critique">批判性分析</option><option value="reproduction">复现记录</option></select></label>'
