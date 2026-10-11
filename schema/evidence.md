@@ -55,6 +55,4 @@
 
 `anchors` 可以描述 `section`、`page`、`text`、`equation`、`figure` 或 `table`。不能编造页码、文本范围或图表编号；无法精确定位时使用真实的较粗粒度锚点，或保持空数组。
 
-## 私人工作区数据
-
-阅读状态和个人笔记不写入 evidence sidecar，也不自动进入公开 Wiki。静态前端使用版本化浏览器存储，数据至少包含 `pageSlug`、`readingState`、`notes`；笔记使用稳定 `blockId` 绑定章节。用户通过 JSON 导入导出在浏览器或设备间手动迁移，不连接账号、云同步或后端存储。
+Evidence sidecar 只描述公开页面的证据关系，不承载个人阅读状态或笔记。公开站点也不收集或保存这类私人数据。

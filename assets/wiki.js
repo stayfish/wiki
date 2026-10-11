@@ -27,7 +27,7 @@
   const mapLinks = [...document.querySelectorAll(".reading-map a[href^='#']")];
   const focusButton = document.querySelector("[data-reading-action='focus']");
   let activeCard = cards[0] || null;
-  const stateKey = `reading-state:${window.location.pathname}`;
+  const stateKey = `reading-view:${window.location.pathname}`;
   let savedState = {};
   try {
     savedState = JSON.parse(window.sessionStorage.getItem(stateKey) || "{}");
@@ -204,104 +204,7 @@
     toast.textContent = message; toast.hidden = false; toast.classList.toggle("is-error", error);
     window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(() => { toast.hidden = true; }, 2600);
   };
-  const localWorkspaceStore = {
-    key: "research-workspace:v1",
-    read() {
-      try { return JSON.parse(window.localStorage.getItem(this.key) || '{"version":1,"pages":{}}'); }
-      catch { return { version: 1, pages: {} }; }
-    },
-    write(data) {
-      try { window.localStorage.setItem(this.key, JSON.stringify(data)); return true; }
-      catch { return false; }
-    },
-    page(slug) {
-      const data = this.read();
-      return data.pages[slug] || { readingState: "unread", notes: [] };
-    },
-    updatePage(slug, value) {
-      const data = this.read();
-      data.pages[slug] = value;
-      return this.write(data);
-    },
-  };
-
   if (pageSlug && cards.length) {
-    const form = document.querySelector(".note-form");
-    const blockSelect = form?.elements.block;
-    const notesList = document.querySelector(".notes-list");
-    const notesSearch = document.querySelector("[data-notes-search]");
-    const readingState = document.querySelector("[data-reading-state]");
-    let pageData = localWorkspaceStore.page(pageSlug);
-    pageData.notes ||= [];
-    let editingId = null;
-    const categoryLabels = { understanding: "个人理解", question: "研究问题", critique: "批判性分析", reproduction: "复现记录" };
-
-    mapLinks.forEach((link) => {
-      const target = document.querySelector(link.hash);
-      const option = document.createElement("option");
-      option.value = target?.id || link.hash.slice(1);
-      option.textContent = target?.dataset.headingTitle || target?.querySelector("h2")?.textContent || target?.textContent || link.textContent;
-      blockSelect?.append(option);
-    });
-    if (readingState) {
-      readingState.value = pageData.readingState || "unread";
-      readingState.addEventListener("change", () => {
-        pageData.readingState = readingState.value;
-        if (!localWorkspaceStore.updatePage(pageSlug, pageData)) showToast("阅读状态保存失败，请导出数据后重试。", true);
-      });
-    }
-
-    const renderNotes = () => {
-      if (!notesList) return;
-      notesList.replaceChildren();
-      const query = notesSearch?.value.trim().toLocaleLowerCase() || "";
-      const visibleNotes = pageData.notes.filter((note) => !query || note.content.toLocaleLowerCase().includes(query) || (categoryLabels[note.category] || "").includes(query));
-      if (!visibleNotes.length) {
-        const empty = document.createElement("p"); empty.className = "notes-empty"; empty.textContent = query ? "没有匹配的笔记。" : "还没有笔记。"; notesList.append(empty); return;
-      }
-      visibleNotes.forEach((note) => {
-        const item = document.createElement("article"); item.className = "saved-note";
-        const meta = document.createElement("div"); meta.className = "saved-note-meta";
-        const target = document.getElementById(note.blockId);
-        const targetLabel = target?.matches("h3") ? target.dataset.headingTitle : target?.querySelector("h2")?.textContent;
-        meta.textContent = `${categoryLabels[note.category] || note.category} · ${targetLabel || note.blockId}`;
-        const content = document.createElement("p"); content.textContent = note.content;
-        const actions = document.createElement("div"); actions.className = "saved-note-actions";
-        const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "编辑";
-        edit.addEventListener("click", () => { editingId = note.id; form.elements.category.value = note.category; form.elements.block.value = note.blockId; form.elements.content.value = note.content; form.elements.content.focus(); });
-        const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "删除";
-        remove.addEventListener("click", () => { const previous = pageData.notes; pageData.notes = pageData.notes.filter((value) => value.id !== note.id); if (!localWorkspaceStore.updatePage(pageSlug, pageData)) { pageData.notes = previous; showToast("删除失败，笔记仍已保留。", true); } renderNotes(); });
-        actions.append(edit, remove); item.append(meta, content, actions); notesList.append(item);
-      });
-    };
-    notesSearch?.addEventListener("input", renderNotes);
-
-    form?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const content = form.elements.content.value.trim();
-      if (!content) return;
-      const note = { id: editingId || (crypto.randomUUID?.() || `note-${Date.now()}`), category: form.elements.category.value, blockId: form.elements.block.value, content, updatedAt: new Date().toISOString() };
-      const index = pageData.notes.findIndex((value) => value.id === note.id);
-      if (index >= 0) pageData.notes[index] = note; else pageData.notes.push(note);
-      if (!localWorkspaceStore.updatePage(pageSlug, pageData)) { if (index < 0) pageData.notes.pop(); showToast("保存失败，输入内容已保留。请导出后重试。", true); return; }
-      editingId = null; form.reset(); renderNotes(); showToast("笔记已保存");
-    });
-    document.querySelector("[data-notes-export]")?.addEventListener("click", () => {
-      const blob = new Blob([JSON.stringify({ version: 1, pageSlug, ...pageData }, null, 2)], { type: "application/json" });
-      const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `${pageSlug}-notes.json`; link.click(); URL.revokeObjectURL(link.href);
-    });
-    document.querySelector("[data-notes-import]")?.addEventListener("change", async (event) => {
-      const file = event.target.files?.[0]; if (!file) return;
-      try {
-        const imported = JSON.parse(await file.text());
-        if (imported.version !== 1 || imported.pageSlug !== pageSlug || !Array.isArray(imported.notes)) throw new Error("invalid notes file");
-        pageData = { readingState: imported.readingState || "unread", notes: imported.notes };
-        if (!localWorkspaceStore.updatePage(pageSlug, pageData)) throw new Error("storage unavailable"); if (readingState) readingState.value = pageData.readingState; renderNotes(); showToast("笔记已导入");
-      } catch { showToast("笔记文件无效、页面不匹配或无法保存。", true); }
-      event.target.value = "";
-    });
-    renderNotes();
-
     let evidence = { claims: [] };
     try { evidence = JSON.parse(document.body.dataset.evidence || '{"claims":[]}'); } catch { evidence = { claims: [] }; }
     const evidenceList = document.querySelector(".evidence-list");
@@ -324,7 +227,7 @@
       });
     };
     renderEvidence(activeCard?.id);
-    document.addEventListener("reading:active", (event) => { if (blockSelect) blockSelect.value = event.detail.blockId; renderEvidence(event.detail.blockId); });
+    document.addEventListener("reading:active", (event) => renderEvidence(event.detail.blockId));
   }
 
   document.querySelectorAll("[data-panel-tab]").forEach((tab) => {
@@ -410,18 +313,13 @@
   document.addEventListener("pointerdown", (event) => { if (termPopover && !termPopover.hidden && !termPopover.contains(event.target) && !event.target.closest?.(".term-link")) termPopover.hidden = true; });
 
   const selectionTools = document.querySelector("[data-selection-tools]");
-  let selectedText = ""; let selectedBlock = "";
+  let selectedText = "";
   document.addEventListener("selectionchange", () => {
     const selection = window.getSelection(); const text = selection?.toString().trim(); const node = selection?.anchorNode?.parentElement?.closest?.(".note-card");
     if (!selectionTools || !text || !node || text.length > 1000) { if (selectionTools) selectionTools.hidden = true; return; }
-    selectedText = text; selectedBlock = node.id; const rect = selection.getRangeAt(0).getBoundingClientRect(); selectionTools.hidden = false; selectionTools.style.left = `${Math.max(8, rect.left)}px`; selectionTools.style.top = `${Math.max(64, rect.top - 46)}px`;
+    selectedText = text; const rect = selection.getRangeAt(0).getBoundingClientRect(); selectionTools.hidden = false; selectionTools.style.left = `${Math.max(8, rect.left)}px`; selectionTools.style.top = `${Math.max(64, rect.top - 46)}px`;
   });
   document.querySelector("[data-selection-copy]")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(selectedText); showToast("选文已复制"); } catch { showToast("复制失败", true); } selectionTools.hidden = true; });
-  document.querySelector("[data-selection-note]")?.addEventListener("click", () => {
-    const form = document.querySelector(".note-form"); if (!form) return;
-    document.querySelector("[data-panel-tab='notes']")?.click(); openPanel("research"); form.elements.block.value = selectedBlock; form.elements.content.value = `> ${selectedText}\n\n`; form.elements.content.focus(); selectionTools.hidden = true;
-  });
-
   const decorateFormulas = () => document.querySelectorAll("mjx-container[display='true']").forEach((formula, index) => {
     if (formula.parentElement?.classList.contains("formula-block")) return;
     const wrapper = document.createElement("div"); wrapper.className = "formula-block"; wrapper.dataset.formula = String(index + 1); formula.before(wrapper); wrapper.append(formula);
