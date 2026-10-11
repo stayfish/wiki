@@ -113,7 +113,6 @@ def session_switcher(current: Session, sessions: list[Session]) -> str:
         '<div class="panel-heading"><div><span class="eyebrow">Sessions</span><h2>研究会话</h2></div>'
         '<button type="button" class="panel-close" data-panel-close="sessions" aria-label="关闭研究会话">×</button></div>'
         f'<nav class="session-switcher"><ul>{items}</ul>'
-        '<a class="session-switcher-all" href="../index.html">查看全部 Session <span aria-hidden="true">→</span></a>'
         '</nav></aside>'
     )
 
