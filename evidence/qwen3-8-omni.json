@@ -1,1 +1,79 @@
-{"version":1,"page_slug":"qwen3-8-omni","source_version":"arXiv v1","blocks":{"为什么读":"section-7ccbb88207","研究问题与价值":"section-208e298a29","已有解法与缺口":"section-5338fde268","作者思路重建":"section-5d08e74a49","核心直觉":"section-fdfed71299","方法：从输入到输出":"section-b82dde408e","方法：从输入到输出 / 输入表示":"section-e3d11dde6d","方法：从输入到输出 / 长上下文骨干":"section-da9b2830c1","方法：从输入到输出 / 训练过程":"section-bfc7f36680","方法：从输入到输出 / 一个完整 Agent pipeline":"section-a67bd44868","数学与理论":"section-53d2041e3d","数学与理论 / Spatial AuT 为什么保留复数 STFT":"section-ec6f0e4b99","数学与理论 / QSA 的选择与复杂度":"section-b419c41ace","实验：问题、验证与答案":"section-8b4925302b","实验：问题、验证与答案 / Omni 化是否损伤文字与视觉能力？":"section-d851ede17b","实验：问题、验证与答案 / 新模型是否改善音频和音视频能力？":"section-9f254f1238","实验：问题、验证与答案 / Agent harness 是否提高长音视频理解？":"section-8a5d848a8b","实验：问题、验证与答案 / 模型是否具有更强的多模态工具执行能力？":"section-a1d64bc290","实验：问题、验证与答案 / 能否形成真实迭代闭环？":"section-f77f4d1caf","实验：问题、验证与答案 / 各组件分别贡献多少？":"section-b656403dee","Takeaways":"section-bc01ac0626","最脆弱的假设":"section-53a1dad4fc","一周最小复现":"section-e69163b190","如何反驳：反例设计":"section-f59105c55c","后续研究与新认知":"section-3765a06a1a","Follow-up idea":"section-1a6cd741a6","与 Wiki 的连接":"section-c2ec83d920","来源与证据边界":"section-310b148d99"},"claims":[{"id":"claim-qsa-context-access","block_id":"section-da9b2830c1","claim_type":"author","verification_status":"located","summary":"QSA 在已经载入的上下文中选择候选块，不能访问尚未进入上下文的原始视频。","anchors":[{"kind":"section","label":"Qwen Sparse Attention","source_url":"https://arxiv.org/abs/2609.25611"}]},{"id":"claim-agentic-benchmark-gain","block_id":"section-8a5d848a8b","claim_type":"experiment","verification_status":"located","summary":"Qwen Code 设置在三项长音视频基准上均高于 Static 设置。","anchors":[{"kind":"table","label":"Agentic long-video evaluation table","source_url":"https://arxiv.org/abs/2609.25611"}]},{"id":"claim-component-attribution","block_id":"section-b656403dee","claim_type":"analysis","verification_status":"unavailable","summary":"论文缺少覆盖模型、训练、插件与 Harness 的完整因子化消融。","anchors":[]}]}
+{
+  "version": 1,
+  "page_slug": "qwen3-8-omni",
+  "source_version": "arXiv v1",
+  "blocks": {
+    "摘要翻译": "section-5d77f780e4",
+    "问题空间": "section-7ccbb88207",
+    "问题空间 / 为什么读": "section-c26653352a",
+    "问题空间 / 研究问题与价值": "section-208e298a29",
+    "问题空间 / 已有解法与缺口": "section-5338fde268",
+    "Idea 是怎样形成的": "section-eb6fa19654",
+    "Idea 是怎样形成的 / 分析性思路重建": "section-5d08e74a49",
+    "Idea 是怎样形成的 / 核心直觉": "section-fdfed71299",
+    "方法": "section-b82dde408e",
+    "方法 / Problem setting 与 formulation": "section-188958cecb",
+    "方法 / 输入表示": "section-e3d11dde6d",
+    "方法 / 长上下文骨干": "section-da9b2830c1",
+    "方法 / 训练过程": "section-bfc7f36680",
+    "方法 / 一个完整 Agent pipeline": "section-a67bd44868",
+    "数学与理论": "section-53d2041e3d",
+    "数学与理论 / Spatial AuT 为什么保留复数 STFT": "section-ec6f0e4b99",
+    "数学与理论 / QSA 的选择与复杂度": "section-b419c41ace",
+    "实验：问题、验证与答案": "section-8b4925302b",
+    "实验：问题、验证与答案 / Omni 化是否损伤文字与视觉能力？": "section-d851ede17b",
+    "实验：问题、验证与答案 / 新模型是否改善音频和音视频能力？": "section-9f254f1238",
+    "实验：问题、验证与答案 / Agent harness 是否提高长音视频理解？": "section-8a5d848a8b",
+    "实验：问题、验证与答案 / 模型是否具有更强的多模态工具执行能力？": "section-a1d64bc290",
+    "实验：问题、验证与答案 / 能否形成真实迭代闭环？": "section-f77f4d1caf",
+    "实验：问题、验证与答案 / 各组件分别贡献多少？": "section-b656403dee",
+    "贡献与边界": "section-f24c243428",
+    "贡献与边界 / Takeaways": "section-bc01ac0626",
+    "贡献与边界 / 最脆弱的假设": "section-53a1dad4fc",
+    "研究响应": "section-eee0d409a1",
+    "研究响应 / 一周最小复现": "section-e69163b190",
+    "研究响应 / 如何反驳：反例设计": "section-f59105c55c",
+    "研究响应 / 后续研究与新认知": "section-3765a06a1a",
+    "研究响应 / Follow-up idea": "section-1a6cd741a6",
+    "与 Wiki 的连接": "section-c2ec83d920",
+    "来源与证据边界": "section-310b148d99"
+  },
+  "claims": [
+    {
+      "id": "claim-qsa-context-access",
+      "block_id": "section-da9b2830c1",
+      "claim_type": "author",
+      "verification_status": "located",
+      "summary": "QSA 在已经载入的上下文中选择候选块，不能访问尚未进入上下文的原始视频。",
+      "anchors": [
+        {
+          "kind": "section",
+          "label": "Qwen Sparse Attention",
+          "source_url": "https://arxiv.org/abs/2609.25611"
+        }
+      ]
+    },
+    {
+      "id": "claim-agentic-benchmark-gain",
+      "block_id": "section-8a5d848a8b",
+      "claim_type": "experiment",
+      "verification_status": "located",
+      "summary": "Qwen Code 设置在三项长音视频基准上均高于 Static 设置。",
+      "anchors": [
+        {
+          "kind": "table",
+          "label": "Agentic long-video evaluation table",
+          "source_url": "https://arxiv.org/abs/2609.25611"
+        }
+      ]
+    },
+    {
+      "id": "claim-component-attribution",
+      "block_id": "section-b656403dee",
+      "claim_type": "analysis",
+      "verification_status": "unavailable",
+      "summary": "论文缺少覆盖模型、训练、插件与 Harness 的完整因子化消融。",
+      "anchors": []
+    }
+  ]
+}
