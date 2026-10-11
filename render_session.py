@@ -90,7 +90,32 @@ def parse_session(path: Path) -> Session:
     )
 
 
-def session_document(session: Session) -> str:
+def session_switcher(current: Session, sessions: list[Session]) -> str:
+    others = sorted(
+        (item for item in sessions if item.slug != current.slug),
+        key=lambda item: (item.updated, item.created, item.slug),
+        reverse=True,
+    )
+    items = "".join(
+        '<li>'
+        f'<a href="../{html.escape(item.slug, quote=True)}/index.html">'
+        f'<span class="session-switcher-title">{html.escape(item.title)}</span>'
+        f'<span class="session-switcher-meta">{html.escape(item.updated)} · {item.turn_count} 轮</span>'
+        '</a></li>'
+        for item in others
+    )
+    if not items:
+        items = '<li class="session-switcher-empty">暂无其他对话</li>'
+    return (
+        '<nav class="session-switcher" aria-label="其他对话">'
+        '<div class="session-switcher-heading"><span class="eyebrow">Sessions</span><h3>其他对话</h3></div>'
+        f'<ul>{items}</ul>'
+        '<a class="session-switcher-all" href="../index.html">查看全部 Session <span aria-hidden="true">→</span></a>'
+        '</nav>'
+    )
+
+
+def session_document(session: Session, sessions: list[Session]) -> str:
     block_ids = {
         f"Turn {number} · {title.strip()}": f"block-{number}"
         for number, title in re.findall(r"^## Turn (\d{2})\s*·\s*(.+)$", session.body, flags=re.MULTILINE)
@@ -111,6 +136,12 @@ def session_document(session: Session) -> str:
         '</div>'
     )
     source = "未绑定公开来源" if session.source == "none" else session.source
+    map_html = reading_map(session.body, ("session", "Conversation Turn"), block_ids=block_ids)
+    map_html = map_html.replace(
+        '<ol class="reading-map-list">',
+        f'{session_switcher(session, sessions)}<ol class="reading-map-list">',
+        1,
+    )
     research_panel = (
         '<aside class="research-panel" id="research-panel" aria-label="讨论信息">'
         '<div class="panel-heading"><div><span class="eyebrow">Workspace</span><h2>讨论信息</h2></div>'
@@ -123,7 +154,8 @@ def session_document(session: Session) -> str:
     )
     body = (
         '<body class="reading-page-body session-page" data-accent="deep">'
-        '<nav class="topbar"><span class="brand"><span aria-hidden="true">R·</span> Local Session</span>'
+        '<nav class="topbar"><a class="brand" href="../index.html" aria-label="返回 Session 仪表盘">'
+        '<span aria-hidden="true">R·</span> Local Session</a>'
         f'<span class="topbar-title">{html.escape(session.title)}</span><div class="workspace-actions">'
         '<button type="button" data-panel-toggle="map" aria-controls="reading-map" aria-expanded="false">目录</button>'
         '<button type="button" data-panel-toggle="research" aria-controls="research-panel" aria-expanded="false">讨论信息</button></div></nav>'
@@ -132,7 +164,7 @@ def session_document(session: Session) -> str:
         '<header class="hero"><span class="eyebrow">Session · private workspace</span>'
         f'<h1>{html.escape(session.title)}</h1>'
         f'<p>{html.escape(source)}</p></header>'
-        f'<div class="reading-shell">{reading_map(session.body, ("session", "Conversation Turn"), block_ids=block_ids)}'
+        f'<div class="reading-shell">{map_html}'
         f'<article class="block-article">{rendered}</article>{research_panel}</div>'
         '<footer>Local session · Compile to Wiki only on explicit request</footer>'
         '</main><div class="panel-scrim" data-panel-scrim hidden></div><script src="../../assets/wiki.js"></script></body>'
@@ -230,13 +262,11 @@ def main() -> int:
             else:
                 LOGGER.info("Sessions: validated %d", len(sessions))
         else:
-            for session in sessions:
+            dashboard_sessions = [parse_session(path) for path in discover_sessions()]
+            for session in dashboard_sessions:
                 target = session.path.parent / "index.html"
-                target.write_text(session_document(session), encoding="utf-8")
+                target.write_text(session_document(session, dashboard_sessions), encoding="utf-8")
                 LOGGER.info("Session: rendered %s", target.relative_to(ROOT))
-            dashboard_sessions = sessions
-            if args.source is not None:
-                dashboard_sessions = [parse_session(path) for path in discover_sessions()]
             dashboard = render_dashboard(dashboard_sessions)
             LOGGER.info("Sessions: rendered dashboard %s", dashboard.relative_to(ROOT))
         return 0

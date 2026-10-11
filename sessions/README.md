@@ -5,7 +5,7 @@
 Session 可能包含私人讨论和未经审核的推断，因此所有子目录都被 Git 忽略。完整格式与编译规则见 [`schema/session.md`](../schema/session.md)。
 
 ```bash
-# 重建一个 session，并刷新总览
+# 校验指定 session，再同步重建所有对话页与总览
 uv run python render_session.py sessions/<session-slug>/session.md
 
 # 校验或重建全部 session
