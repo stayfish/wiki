@@ -15,6 +15,8 @@
 ```text
 人与 Agent 对话
       ↓
+ sessions/（本地讨论记录，不提交）
+      ↓ 用户明确要求编译
 公开来源 → raw/（不可变）
       ↓ 阅读、讨论、综合
     wiki/（持续修订）
@@ -54,6 +56,8 @@
 
 完整暂停点和示例见 `schema/conversation.md`。
 
+阅读和研究型对话默认维护一个本地 session。一个 session 对应一篇论文或一条连续研究线程，内部包含多轮 turn；不要为每轮问答新建 session。每次实质回答前更新 session 的 Markdown 与静态 HTML，并在 Codex 回复中给出 HTML 链接。Session 只记录讨论，不自动触发 Wiki 写入。
+
 ## 4. 仓库结构
 
 ```text
@@ -63,6 +67,7 @@ wiki/
 ├── schema/
 │   ├── SCHEMA.md              # 总契约、证据和写入规则
 │   ├── conversation.md        # 自然语言对话工作流
+│   ├── session.md             # 本地多轮讨论记录
 │   ├── source.md              # 阅读笔记的共享来源契约
 │   ├── glance.md              # 论文速览与阅读价值判断
 │   ├── deepnote.md            # 论文深入阅读笔记
@@ -74,8 +79,10 @@ wiki/
 ├── log.md                     # 追加式操作时间线
 ├── reader-profile.md          # 读者背景与解释深度偏好
 ├── raw/                       # 不可变来源或来源指针
+├── sessions/                  # 本地静态讨论页，默认被 Git 忽略
 ├── wiki/                      # Agent 维护的 Markdown 知识
 ├── render.py                  # 静态网站构建器
+├── render_session.py          # 单个 session 的本地页面构建器
 ├── assets/                    # UI 样式和交互
 ├── site/                      # 生成结果，不提交
 └── .github/workflows/pages.yml
@@ -110,6 +117,7 @@ wiki/
 - 新页不能成为孤岛；必须进入 `index.md`，并至少说明它与其他页面的语义关系。知识库为空时，第一篇来源可暂时只连接它产生的真实概念或线索，不制造假链接。
 - 记录用户在对话中确认的关注点和判断，但明确标为用户观点，不能归因给作者。
 - deepnote 的最终标题层级沿用讨论时形成的分块逻辑。模板条目是覆盖检查表，不是必须机械照抄的固定目录。
+- 只有用户明确要求“写入 Wiki”“沉淀”或“入库”时，才从整个 session 综合 `glance` / `deepnote`，并按真实知识影响更新 `concepts`、`topics` 与 `threads`。不能把聊天逐字复制成公开页面。
 - 更新 `index.md`；向 `log.md` 追加规范化 `ingest` 条目。
 
 ## 6. 写作与证据风格
@@ -163,7 +171,7 @@ Wiki 会公开。不得写入或提交：
 
 ```bash
 uv sync
-uv run python -m py_compile render.py
+uv run python -m py_compile render.py render_session.py
 uv run python render.py --check
 uv run python render.py
 ```
@@ -178,6 +186,8 @@ uv run python render.py
 - 内部链接和相对资源路径正确；
 - `git diff --check` 通过；
 - `site/`、缓存和环境文件没有被提交。
+
+维护 session 的回合还要运行 `uv run python render_session.py sessions/<slug>/session.md --check` 和不带 `--check` 的渲染命令，并确认对应 `index.html` 存在。Session 目录保持忽略状态，不纳入提交。
 
 ## 11. Git 与发布
 

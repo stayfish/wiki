@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-10-10] lint | 引入本地 session 与摘要翻译卡片
+
+- 将阅读对话保存为本地主题 session：一个 session 包含多轮 turn，每轮回答继续按论文问题树分层，并生成 Codex 可链接的静态页面。
+- Session 默认被 Git 忽略且不发布；只有用户明确要求写入时，才从完整讨论综合 glance、deepnote、concept、topic 与 thread。
+- deepnote 新增全文阅读后完成的忠实摘要翻译，并使用独立的 Abstract Translation 卡片与分析正文分开。
+
 ## [2026-10-10] lint | 将 deepnote 改为分块精读与交互式页面
 
 - 在深度判断后新增“分层阅读地图”阶段：先恢复问题背景、相关工作与挑战、观察与猜想、方法、实验论证、贡献和局限，再递归拆分复杂块。

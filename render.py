@@ -26,6 +26,7 @@ WIKILINK = re.compile(r"\[\[([a-z0-9][a-z0-9-]*)(?:\|([^\]]+))?\]\]")
 INLINE = re.compile(r"(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)|\[\[[^\]]+\]\])")
 IMAGE = re.compile(r'^!\[([^]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)$')
 SECTION_ROLES = (
+    ("abstract", "Abstract Translation", ("摘要翻译", "abstract translation")),
     ("reference", "Reference", ("来源", "wiki", "连接")),
     ("frontier", "Frontier", ("复现", "后续", "follow-up", "研究响应", "下一步")),
     ("contribution", "Contribution", ("贡献", "takeaway", "结论")),
@@ -169,9 +170,11 @@ def reading_outline(source: str) -> list[dict[str, object]]:
     return outline
 
 
-def reading_map(source: str) -> str:
+def reading_map(source: str, role_override: tuple[str, str] | None = None) -> str:
     items: list[str] = []
     for block in reading_outline(source):
+        if role_override is not None:
+            block["role"], block["label"] = role_override
         children = block["children"]
         child_html = ""
         if isinstance(children, list) and children:
@@ -218,7 +221,13 @@ def inline_markup(text: str, pages: dict[str, Page]) -> str:
     return "".join(result)
 
 
-def markdown_to_html(source: str, pages: dict[str, Page], card_sections: bool = False) -> str:
+def markdown_to_html(
+    source: str,
+    pages: dict[str, Page],
+    card_sections: bool = False,
+    paper_asset_prefix: str | None = "../paper-assets/",
+    section_role_override: tuple[str, str] | None = None,
+) -> str:
     output: list[str] = []
     paragraph: list[str] = []
     bullets: list[str] = []
@@ -288,8 +297,8 @@ def markdown_to_html(source: str, pages: dict[str, Page], card_sections: bool = 
         if image_match:
             flush()
             alt, src, title = image_match.groups()
-            if src.startswith("../../assets/papers/"):
-                src = "../paper-assets/" + src.removeprefix("../../assets/papers/")
+            if paper_asset_prefix is not None and src.startswith("../../assets/papers/"):
+                src = paper_asset_prefix + src.removeprefix("../../assets/papers/")
             caption = title or alt
             output.append(
                 '<figure class="paper-figure">'
@@ -297,7 +306,7 @@ def markdown_to_html(source: str, pages: dict[str, Page], card_sections: bool = 
                 f'<figcaption>{inline_markup(caption, pages)}</figcaption></figure>'
             )
             continue
-        heading = re.match(r"^(#{1,3})\s+(.+)$", stripped)
+        heading = re.match(r"^(#{1,4})\s+(.+)$", stripped)
         if heading:
             flush(); level = len(heading.group(1))
             if level == 2 and card_sections:
@@ -306,7 +315,7 @@ def markdown_to_html(source: str, pages: dict[str, Page], card_sections: bool = 
                 section_number += 1
                 child_number = 0
                 title = heading_text(heading.group(2))
-                role, label = section_role(title)
+                role, label = section_role_override or section_role(title)
                 section_id = f"block-{section_number:02}"
                 output.append(
                     f'<section class="note-card role-{role}" id="{section_id}" data-block-role="{role}">'

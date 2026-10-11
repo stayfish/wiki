@@ -19,8 +19,10 @@ uv sync
 ## 目录
 
 - `raw/`：公开原始资料或来源指针；大型、私密或无权公开的材料不要提交。
+- `sessions/`：本地阅读讨论页；一个主题包含多轮问答，默认忽略且不发布。
 - `wiki/`：Markdown 知识页，是内容的唯一真实来源。
 - `render.py`：静态网站构建器。
+- `render_session.py`：把单个 session 的 Markdown 渲染为本地静态页面。
 - `assets/`：全站样式与滚动动画。
 - `schema/`：阅读对话工作流、内容契约和各类页面模板。
 - `reader-profile.md`：只记录决定解释深度所需的读者背景。
@@ -41,7 +43,7 @@ uv sync
 判断这篇论文是否值得精读，先和我讨论，不要写入 Wiki：<路径或 URL>
 ```
 
-Agent 会说明实际阅读范围，回答研究问题、已有不足、方法直觉、结论、实验验证和 takeaways，并建议保存为 `glance` 或 `deepnote`。进入 deepnote 后，Agent 先给出可调整的分层阅读地图和关键图表计划，再按问题背景、灵感与猜想、方法、实验论证、贡献和局限等块逐步讨论。最终页面沿用讨论结构，以卡片、章节导航、关键图表、折叠、聚焦和阅读进度呈现。你可以继续追问或指定重点，然后说：
+Agent 会为同一篇论文或研究线程维护一个本地 session，把每轮问答更新为可点击的静态页面。它会说明实际阅读范围，回答研究问题、已有不足、方法直觉、结论、实验验证和 takeaways，并建议保存为 `glance` 或 `deepnote`。进入 deepnote 后，Agent 先给出可调整的分层阅读地图和关键图表计划，再按问题背景、灵感与猜想、方法、实验论证、贡献和局限等块逐步讨论。最终 deepnote 还包含独立的摘要翻译卡片。你可以继续追问或指定重点，然后说：
 
 ```text
 按“方法为什么有效”这个重点，把刚才的讨论写入 Wiki。
@@ -73,6 +75,12 @@ Agent 会说明实际阅读范围，回答研究问题、已有不足、方法�
 
 完整规则见 [`schema/SCHEMA.md`](./schema/SCHEMA.md) 和 [`schema/conversation.md`](./schema/conversation.md)。
 
+Session 页面可手动重建：
+
+```bash
+uv run python render_session.py sessions/<session-slug>/session.md
+```
+
 检查内容：
 
 ```bash
@@ -96,7 +104,7 @@ uv run python -m http.server 8000 -d site
 执行生成结果检查：
 
 ```bash
-uv run python -m py_compile render.py
+uv run python -m py_compile render.py render_session.py
 uv run python render.py --check
 ```
 

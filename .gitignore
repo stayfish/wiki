@@ -16,3 +16,6 @@ dist/
 build/
 site/
 *.egg-info/
+
+# Local conversation sessions (may contain private discussion)
+sessions/*/

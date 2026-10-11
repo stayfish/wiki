@@ -11,7 +11,9 @@
 - 新材料应修订已有理解、补充证据或暴露冲突，而不只是增加孤立页面。
 - 后续回答优先使用已经编译的 Wiki；只有核验和补缺时才回到原始来源。
 
-## 三层结构
+## 工作记录与三层知识结构
+
+- `sessions/`：本地对话工作区。一个目录对应一篇论文或一条连续研究线程，保存多轮讨论的 Markdown 与静态 HTML；默认不提交、不发布，也不是知识事实来源。
 
 - `raw/`：来源文件或来源指针。保存后不可静默改写，是可追溯的事实底座。
 - `wiki/`：可读的 Markdown 知识页，由 Agent 创建和维护，人负责审核。
@@ -27,6 +29,8 @@
 - `wiki/threads/`：尚未闭合、值得继续追踪的问题；遵循 [`thread.md`](./thread.md)。
 
 操作顺序、对话暂停点和触发语见 [`conversation.md`](./conversation.md)。只有出现真实内容时才创建目录或页面。
+
+Session 遵循 [`session.md`](./session.md)。Session 中可以保留探索、纠偏和未决猜测；写入 Wiki 时必须重新核对来源、压缩重复内容并按页面类型分流，不能把对话记录直接当成已审核知识。
 
 ## 通用 Frontmatter
 
@@ -120,6 +124,7 @@ accent: moss
 - 卡片的语义角色由标题和内容类型生成，例如 Context、Insight、Method、Evidence、Contribution、Critique、Frontier、Reference。语义角色只影响呈现，不改变证据等级。
 - 页面可提供章节跳转、折叠/展开、聚焦阅读、复制块链接和阅读进度等渐进增强交互。关闭 JavaScript 时，正文仍须完整、顺序正确且可阅读。
 - Rich Response 优先使用真正有信息结构的公式、代码、图示、结果表与内部链接；禁止用装饰组件制造虚假丰富度。
+- deepnote 必须包含独立的“摘要翻译”块。构建器将它渲染为区别于分析卡片的 Abstract Translation 卡；该块只翻译论文摘要，不混入背景补充、评价或 Agent 推断。
 
 ## 完成标准
 
