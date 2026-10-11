@@ -16,7 +16,7 @@ sessions/index.html  # 自动生成的本地总览，不提交
 - `sessions/*/` 默认被 Git 忽略，避免公开聊天内容、本地来源线索或尚未审核的推断。
 - 每轮先把用户输入原文和 Agent 完整回答原文追加到 `session.md`，再运行 `render_session.py`。
 - 渲染任一 session 时同步刷新全部本地 session 页面与 `sessions/index.html`，保证跨 session 导航不会过期；不带路径运行渲染器时执行相同的批量重建。
-- 单个 session 页面的顶部品牌入口返回总览；左侧阅读地图同时列出其他 session，便于在连续讨论之间快速切换。
+- 单个 session 页面的顶部品牌入口返回总览；其他 session 与论文结构使用两个独立左栏，便于切换对话且不混淆页面内导航。窄屏下两栏分别折叠为“对话”和“目录”抽屉。
 - 渲染成功后，Codex 对话区的最终回复只包含 `index.html` 的本地链接；完整回答只在 session 页面展示，避免两处重复。
 
 ## Frontmatter

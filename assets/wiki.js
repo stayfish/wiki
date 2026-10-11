@@ -147,6 +147,7 @@
   }
 
   const panels = {
+    sessions: document.querySelector("#session-list-panel"),
     map: document.querySelector("#reading-map"),
     research: document.querySelector("#research-panel"),
   };

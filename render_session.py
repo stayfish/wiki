@@ -107,11 +107,12 @@ def session_switcher(current: Session, sessions: list[Session]) -> str:
     if not items:
         items = '<li class="session-switcher-empty">暂无其他对话</li>'
     return (
-        '<nav class="session-switcher" aria-label="其他对话">'
-        '<div class="session-switcher-heading"><span class="eyebrow">Sessions</span><h3>其他对话</h3></div>'
-        f'<ul>{items}</ul>'
+        '<aside class="session-list-panel" id="session-list-panel" aria-label="其他对话">'
+        '<div class="panel-heading"><div><span class="eyebrow">Sessions</span><h2>其他对话</h2></div>'
+        '<button type="button" class="panel-close" data-panel-close="sessions" aria-label="关闭其他对话">×</button></div>'
+        f'<nav class="session-switcher"><ul>{items}</ul>'
         '<a class="session-switcher-all" href="../index.html">查看全部 Session <span aria-hidden="true">→</span></a>'
-        '</nav>'
+        '</nav></aside>'
     )
 
 
@@ -137,11 +138,7 @@ def session_document(session: Session, sessions: list[Session]) -> str:
     )
     source = "未绑定公开来源" if session.source == "none" else session.source
     map_html = reading_map(session.body, ("session", "Conversation Turn"), block_ids=block_ids)
-    map_html = map_html.replace(
-        '<ol class="reading-map-list">',
-        f'{session_switcher(session, sessions)}<ol class="reading-map-list">',
-        1,
-    )
+    switcher_html = session_switcher(session, sessions)
     research_panel = (
         '<aside class="research-panel" id="research-panel" aria-label="讨论信息">'
         '<div class="panel-heading"><div><span class="eyebrow">Workspace</span><h2>讨论信息</h2></div>'
@@ -157,6 +154,7 @@ def session_document(session: Session, sessions: list[Session]) -> str:
         '<nav class="topbar"><a class="brand" href="../index.html" aria-label="返回 Session 仪表盘">'
         '<span aria-hidden="true">R·</span> Local Session</a>'
         f'<span class="topbar-title">{html.escape(session.title)}</span><div class="workspace-actions">'
+        '<button type="button" data-panel-toggle="sessions" aria-controls="session-list-panel" aria-expanded="false">对话</button>'
         '<button type="button" data-panel-toggle="map" aria-controls="reading-map" aria-expanded="false">目录</button>'
         '<button type="button" data-panel-toggle="research" aria-controls="research-panel" aria-expanded="false">讨论信息</button></div></nav>'
         '<div class="reading-progress" aria-hidden="true"><span></span></div>'
@@ -164,7 +162,7 @@ def session_document(session: Session, sessions: list[Session]) -> str:
         '<header class="hero"><span class="eyebrow">Session · private workspace</span>'
         f'<h1>{html.escape(session.title)}</h1>'
         f'<p>{html.escape(source)}</p></header>'
-        f'<div class="reading-shell">{map_html}'
+        f'<div class="reading-shell">{switcher_html}{map_html}'
         f'<article class="block-article">{rendered}</article>{research_panel}</div>'
         '<footer>Local session · Compile to Wiki only on explicit request</footer>'
         '</main><div class="panel-scrim" data-panel-scrim hidden></div><script src="../../assets/wiki.js"></script></body>'
