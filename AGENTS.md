@@ -56,7 +56,7 @@
 
 完整暂停点和示例见 `schema/conversation.md`。
 
-阅读和研究型对话默认维护一个本地 session。一个 session 对应一篇论文或一条连续研究线程，内部包含多轮 turn；不要为每轮问答新建 session。每次实质回答前更新 session 的 Markdown 与静态 HTML，并在 Codex 回复中给出 HTML 链接。Session 只记录讨论，不自动触发 Wiki 写入。
+阅读和研究型对话默认维护一个本地 session。一个 session 对应一篇论文或一条连续研究线程，内部包含多轮 turn；不要为每轮问答新建 session。每轮将用户输入原文和 Agent 的完整回答原文写入 session，不压缩、改写或省略；随后重建静态 HTML。对话区最终只返回对应 HTML 页面的链接，不重复完整回答。Session 只记录讨论，不自动触发 Wiki 写入。
 
 ## 4. 仓库结构
 

@@ -6,7 +6,7 @@
 
 当用户提供论文并说“阅读”“看看”“做笔记”时，默认分四步。其他来源沿用同一原则，但可按媒介调整判断项。
 
-开始阅读时创建或续写一个本地 session：同一篇论文或同一条连续研究线程共用一个 session，每轮用户问题与 Agent 回答作为新的 turn 追加。回答内部按论文问题树继续分层，更新 `sessions/<session-slug>/index.html`，并在 Codex 回复中提供本地页面链接。Session 不使用独立的滚动摘要文件，也不自动写入公开 Wiki。
+开始阅读时创建或续写一个本地 session：同一篇论文或同一条连续研究线程共用一个 session，每轮用户问题与 Agent 回答作为新的 turn 追加。用户输入和 Agent 完整回答均按原文保存，不使用摘要、忠实压缩或省略标记代替原文。Agent 先将完整回答写入 session，再更新 `sessions/<session-slug>/index.html`；Codex 对话区的最终回复只提供该本地页面链接，不再复制回答正文。Session 不使用独立的滚动摘要文件，也不自动写入公开 Wiki。
 
 ### 第一步：判断阅读价值
 
