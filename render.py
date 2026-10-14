@@ -554,11 +554,39 @@ def page_rows(pages: list[Page], page_prefix: str = "") -> str:
 def recent_pages(pages: list[Page]) -> str:
     return (
         '<section class="recent" aria-labelledby="recent-title">'
-        '<div class="section-heading"><span class="section-number">§ 01</span>'
+        '<div class="section-heading"><span class="section-number">§ 02</span>'
         '<div><span class="eyebrow">All pages · no pagination</span>'
         '<h2 id="recent-title"><a href="recent.html">最近更新 <em>Recent</em></a></h2>'
         '<a class="section-link" href="recent.html">浏览全部页面 →</a></div></div>'
         f'<div class="recent-list">{page_rows(pages)}</div></section>'
+    )
+
+
+def reading_list_section() -> str:
+    return (
+        '<section class="reading-inbox" aria-labelledby="reading-inbox-title" '
+        'data-reading-list data-repository="stayfish/wiki" '
+        'data-reading-workflow="https://github.com/stayfish/wiki/actions/workflows/add-reading.yml">'
+        '<div class="section-heading"><span class="section-number">§ 01</span>'
+        '<div><span class="eyebrow">Reading inbox · GitHub Issues</span>'
+        '<h2 id="reading-inbox-title">待读论文 <em>Reading list</em></h2>'
+        '<p class="section-intro">粘贴 arXiv、DOI 或论文主页。链接会复制到剪贴板并打开仅仓库所有者可运行的 GitHub Action；Action 读取标题并创建 Issue，关闭 Issue 即表示移出列表。</p>'
+        '</div></div>'
+        '<form class="reading-capture" data-reading-form novalidate>'
+        '<label for="paper-url">论文链接</label>'
+        '<div class="reading-capture-row">'
+        '<input id="paper-url" name="paper_url" type="url" inputmode="url" '
+        'autocomplete="url" autocapitalize="none" spellcheck="false" '
+        'placeholder="https://arxiv.org/abs/…" required data-reading-input>'
+        '<button type="submit">复制并打开 GitHub <span aria-hidden="true">→</span></button>'
+        '</div><p class="reading-capture-note" data-reading-form-status aria-live="polite">'
+        '在 GitHub 点 Run workflow，粘贴后运行；标题和去重由 Action 自动完成。</p></form>'
+        '<div class="reading-queue-head"><span data-reading-count>正在读取…</span>'
+        '<a href="https://github.com/stayfish/wiki/issues?q=is%3Aissue+is%3Aopen+%22%5B%E5%BE%85%E8%AF%BB%5D%22" '
+        'target="_blank" rel="noreferrer">在 GitHub 管理 →</a></div>'
+        '<div class="reading-queue" data-reading-items aria-live="polite">'
+        '<p class="reading-queue-empty">正在从 GitHub 读取待读列表…</p></div>'
+        '</section>'
     )
 
 
@@ -593,7 +621,7 @@ def listing_document(pages: list[Page], kind: str | None = None) -> str:
 
 
 def index_document(pages: list[Page]) -> str:
-    body = f'''<body class="home"><main class="page"><header class="mast"><span>Personal Wiki</span><span>AI maintained · Human reviewed</span></header><div class="cover"><span class="eyebrow">Living notes · {len(pages):03} pages</span><h1>Knowledge,<br><em>kept in motion.</em></h1><p>原始资料负责追溯，Markdown 负责结构，AI 协助整理，人负责判断。</p></div>{type_overview(pages)}{recent_pages(pages)}<footer>Static HTML · GitHub Pages</footer></main><script src="wiki.js"></script></body>'''
+    body = f'''<body class="home"><main class="page"><header class="mast"><span>Personal Wiki</span><span>AI maintained · Human reviewed</span></header><div class="cover"><span class="eyebrow">Living notes · {len(pages):03} pages</span><h1>Knowledge,<br><em>kept in motion.</em></h1><p>原始资料负责追溯，Markdown 负责结构，AI 协助整理，人负责判断。</p></div>{type_overview(pages)}{reading_list_section()}{recent_pages(pages)}<footer>Static HTML · GitHub Pages</footer></main><script src="wiki.js"></script></body>'''
     return shell("Personal Knowledge Wiki", "style.css", body)
 
 

@@ -48,6 +48,7 @@
 - “阅读、看看、帮我理解、先聊聊”：先执行论文价值判断，给出六项阅读卡片和 `glance` / 精读建议，不立即写 Wiki。用户确认值得精读后，再按背景与相关工作、观察与核心 idea、方法、实验与论证、贡献与局限等自然块逐块阅读和讨论。
 - “加入 Wiki、入库、直接整理、保存成笔记”：完成 ingest，可跳过讨论暂停点。
 - “根据笔记回答、我们之前读过什么”：执行 query，默认只回答。
+- “加入待阅读、保存论文链接”：使用公开首页指向的 owner-only `Add to Reading List` GitHub Action。该流程只建立待读 Issue，不读取论文正文、不创建 session，也不写入 Wiki 知识页。
 - “把刚才的回答保存下来、沉淀”：将对话中的长期价值回写已有页或新页面。
 - “整理、检查、回顾知识库”：执行 lint 或阅读回顾。
 - “发布、推送”：只有明确授权后才执行 GitHub 操作。
@@ -85,10 +86,14 @@ wiki/
 ├── wiki/                      # Agent 维护的 Markdown 知识
 ├── render.py                  # 静态网站构建器
 ├── render_session.py          # 单个 session 的本地页面构建器
+├── scripts/
+│   └── resolve_paper_title.py # 为待读链接读取标题并创建 GitHub Issue
 ├── assets/                    # UI 样式和交互
 ├── site/                      # 生成结果，不提交
 └── .github/workflows/pages.yml
 ```
+
+公开首页的 Reading List 使用 GitHub Issues 保存待读状态。仓库所有者通过 `workflow_dispatch` 提交一个公开论文 URL；Action 解析页面元数据、避免重复并创建标题为 `[待读] ...` 的 Issue。关闭 Issue 即从首页列表移除。工作流必须保留 `github.actor == github.repository_owner` 校验；静态页面不得保存 GitHub Token，也不得把普通访客创建的 Issue 当作有效待读项。
 
 页面目录仍为 `sources`、`concepts`、`topics`、`threads`。只有出现真实页面时才创建目录。
 

@@ -23,6 +23,102 @@
     });
   });
 
+  const readingList = document.querySelector("[data-reading-list]");
+  if (readingList) {
+    const repository = readingList.dataset.repository;
+    const workflowUrl = readingList.dataset.readingWorkflow;
+    const form = readingList.querySelector("[data-reading-form]");
+    const input = readingList.querySelector("[data-reading-input]");
+    const formStatus = readingList.querySelector("[data-reading-form-status]");
+    const count = readingList.querySelector("[data-reading-count]");
+    const itemsRoot = readingList.querySelector("[data-reading-items]");
+
+    const paperUrlFromBody = (body = "") => {
+      const match = body.match(/https?:\/\/[^\s<>)\]}]+/);
+      return match ? match[0].replace(/[.,;:，。；：]+$/, "") : "";
+    };
+
+    const renderReadingIssues = (issues) => {
+      itemsRoot.replaceChildren();
+      count.textContent = `${issues.length} 篇待读`;
+      if (!issues.length) {
+        const empty = document.createElement("p");
+        empty.className = "reading-queue-empty";
+        empty.textContent = "待读列表还是空的。粘贴第一篇论文链接即可开始。";
+        itemsRoot.append(empty);
+        return;
+      }
+      issues.forEach((issue) => {
+        const paperUrl = paperUrlFromBody(issue.body || "");
+        const article = document.createElement("article");
+        article.className = "reading-queue-item";
+        const main = document.createElement(paperUrl ? "a" : "span");
+        main.className = "reading-paper-link";
+        main.textContent = issue.title.replace(/^\[待读\]\s*/, "");
+        if (paperUrl) {
+          main.href = paperUrl;
+          main.target = "_blank";
+          main.rel = "noreferrer";
+        }
+        const meta = document.createElement("div");
+        meta.className = "reading-paper-meta";
+        const date = document.createElement("time");
+        date.dateTime = issue.created_at;
+        date.textContent = new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(new Date(issue.created_at));
+        const manage = document.createElement("a");
+        manage.href = issue.html_url;
+        manage.target = "_blank";
+        manage.rel = "noreferrer";
+        manage.textContent = `管理 #${issue.number} →`;
+        meta.append(date, manage);
+        article.append(main, meta);
+        itemsRoot.append(article);
+      });
+    };
+
+    fetch(`https://api.github.com/repos/${repository}/issues?state=open&per_page=100&sort=created&direction=desc`, {
+      headers: { Accept: "application/vnd.github+json" },
+      cache: "no-store",
+    }).then((response) => {
+      if (!response.ok) throw new Error(`GitHub API ${response.status}`);
+      return response.json();
+    }).then((issues) => {
+      const readingIssues = issues.filter((issue) => (
+        !issue.pull_request
+        && issue.user?.login === "github-actions[bot]"
+        && issue.title.startsWith("[待读]")
+        && issue.body?.includes("<!-- reading-list -->")
+      ));
+      renderReadingIssues(readingIssues);
+    }).catch(() => {
+      count.textContent = "暂时无法读取";
+      itemsRoot.innerHTML = '<p class="reading-queue-empty">GitHub 暂时没有返回列表；可以通过右上方链接直接管理 Issues。</p>';
+    });
+
+    form?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      let paperUrl;
+      try {
+        paperUrl = new URL(input.value.trim());
+        if (!["http:", "https:"].includes(paperUrl.protocol)) throw new Error("unsupported protocol");
+      } catch {
+        input.setAttribute("aria-invalid", "true");
+        formStatus.textContent = "请输入完整的 http:// 或 https:// 论文链接。";
+        input.focus();
+        return;
+      }
+      input.removeAttribute("aria-invalid");
+      const opened = window.open(workflowUrl, "_blank", "noopener");
+      try {
+        await navigator.clipboard.writeText(paperUrl.toString());
+        formStatus.textContent = "链接已复制。在 GitHub 点 Run workflow，粘贴到论文链接后运行。";
+      } catch {
+        formStatus.textContent = "GitHub 已打开。请再次复制上方链接并粘贴到 Run workflow。";
+      }
+      if (!opened) window.location.href = workflowUrl;
+    });
+  }
+
   const cards = [...document.querySelectorAll(".note-card")];
   const mapLinks = [...document.querySelectorAll(".reading-map a[href^='#']")];
   const focusButton = document.querySelector("[data-reading-action='focus']");

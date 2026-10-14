@@ -22,6 +22,12 @@
 
 `index.md` 是按内容组织的紧凑地图；`log.md` 是按时间追加的操作记录。两者用途不同，不能互相替代。
 
+## 待读收件箱
+
+尚未阅读的论文链接不属于 `raw/` 或 `wiki/`，也不提前占用 `glance` 页面。公开首页通过 GitHub Issues 展示 Reading List：仓库所有者手动运行 `Add to Reading List` workflow，输入一个公开论文 URL；Action 读取标准网页元数据得到标题并创建 `[待读]` Issue。关闭 Issue 表示完成、放弃或移出队列。
+
+该入口使用 GitHub 自身的写权限和额外的仓库所有者校验。静态站只读取由 `github-actions[bot]` 创建且包含 Reading List 标记的公开 Issue，不持有访问令牌，不接受普通访客直接写入。进入实际阅读时仍按 `conversation.md` 创建 session；只有完成价值判断并收到明确入库要求后，来源才进入 `raw/` 与 `wiki/`。
+
 ## 页面类型与模板
 
 - `wiki/sources/`：单一来源的阅读笔记。`glance` 是完成价值判断后的速览，遵循 [`glance.md`](./glance.md)；`deepnote` 是在全文取证、分块阅读和讨论后编译的深入阅读结果，遵循 [`deepnote.md`](./deepnote.md)。两者共同遵循 [`source.md`](./source.md)，论文还应用 [`paper.md`](./paper.md) 的取证规则。

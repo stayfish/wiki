@@ -23,6 +23,7 @@ uv sync
 - `wiki/`：Markdown 知识页，是内容的唯一真实来源。
 - `render.py`：静态网站构建器。
 - `render_session.py`：把 session Markdown 渲染为本地静态页面，并生成全部 session 的本地总览。
+- `scripts/resolve_paper_title.py`：读取待读论文页面的标准标题元数据，并由 GitHub Action 创建 Issue。
 - `assets/`：全站样式与滚动动画。
 - `schema/`：阅读对话工作流、内容契约和各类页面模板。
 - `reader-profile.md`：只记录决定解释深度所需的读者背景。
@@ -74,6 +75,18 @@ Agent 会为同一篇论文或研究线程维护一个本地 session，把每轮
 ```
 
 完整规则见 [`schema/SCHEMA.md`](./schema/SCHEMA.md)、[`schema/conversation.md`](./schema/conversation.md) 和 [`schema/writing.md`](./schema/writing.md)。
+
+## 手机添加待读论文
+
+公开 Wiki 首页提供 Reading List 输入框。粘贴 arXiv、DOI、OpenReview 或论文主页后，页面会复制链接并打开仓库的 **Add to Reading List** workflow：
+
+1. 点击 **Run workflow**；
+2. 将剪贴板中的 URL 粘贴到唯一输入框；
+3. 再次点击 **Run workflow**。
+
+GitHub 要求仓库写权限才能手动运行 workflow，任务本身还会检查触发者必须是仓库所有者。Action 随后读取论文页面的 `citation_title`、`og:title` 或 HTML `<title>`，避免重复，并创建 `[待读] 论文标题` Issue。首页从 GitHub 的公开 API 读取这些未关闭 Issue；关闭 Issue 即从待读列表移除。
+
+这个流程不会把 GitHub Token 交给浏览器，也不会把待读链接提前写成 `glance`。无法读取标题时，workflow 会失败并保留错误日志，不会创建只有 URL 或错误标题的条目。
 
 Session 页面可手动重建。指定路径用于校验目标 session，渲染器会同步刷新所有对话页与总览，避免跨 session 导航过期：
 
@@ -131,9 +144,9 @@ uv run python render.py --check
 
 ## 静态产品边界
 
-公开站点保持为可直接部署到 GitHub Pages 的静态 HTML、CSS 和浏览器端 JavaScript，不依赖应用后端、账号系统或在线 AI 服务。
+公开站点保持为可直接部署到 GitHub Pages 的静态 HTML、CSS 和浏览器端 JavaScript，不依赖自建应用后端、账号系统或在线 AI 服务。Reading List 复用 GitHub Actions、Issues 和公开 API，不在站点中保存凭据。
 
 - 搜索、阅读模式、阅读偏好和章节导航均在浏览器内完成。
-- 站点不收集或保存个人阅读状态与笔记；长期笔记由对话编译进公开 Wiki，并继续接受人工审核。
+- 站点不收集或保存私人阅读状态与笔记；公开待读链接由仓库所有者明确提交到 GitHub Issues。长期笔记仍由对话编译进公开 Wiki，并继续接受人工审核。
 - Evidence sidecar 随静态构建发布，只链接已经记录的公开来源，不执行服务端 PDF 解析或实时证据定位。
 - 站点不提供实时 AI 助手、跨论文语义问答、云端笔记或需要密钥的功能。

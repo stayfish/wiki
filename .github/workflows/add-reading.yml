@@ -1,0 +1,28 @@
+name: Add to Reading List
+
+on:
+  workflow_dispatch:
+    inputs:
+      paper_url:
+        description: Paper URL (arXiv, DOI, OpenReview, or paper page)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  add:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Resolve title and create issue
+        run: python scripts/resolve_paper_title.py "$PAPER_URL"
+        env:
+          PAPER_URL: ${{ inputs.paper_url }}
+          GH_TOKEN: ${{ github.token }}
