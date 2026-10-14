@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-10-14] ingest | MiniCPM-o 4.5: Towards Real-Time Full-Duplex Omni-Modal Interaction
+
+- 新增 arXiv v1 来源指针与 22 页全文 deepnote，沿分块讨论重建 streaming / real-time / full-duplex 边界、Omni-Flow 三流协议、端到端语音链和四阶段训练。
+- 重点澄清 TAIL 的自适应来自时间戳构造的变长 chunk 监督与自回归 boundary token；公开材料没有额外长度 head，也未披露完整训练 serializer、loss mask 或真实播放器反馈。
+- 用 Tables 1、8、10、12 分离配置选择、连续视觉、语音质量与系统实时性证据；保留“TAIL 未直接测量播放同步、唯一量化 full-duplex 主结果无音频”的核心缺口。
+- 更新全模态架构主题，加入持续交互协议比较轴；新增全双工时序归因线索，连接可执行的积压、陈旧度、打断和抖动恢复实验。
+
 ## [2026-10-11] lint | 柔化 Session 会话导航
 
 - 研究会话栏改用现有纸张色、中性灰和较柔和的藏蓝定位线，降低未选中项与选中背景的对比度。

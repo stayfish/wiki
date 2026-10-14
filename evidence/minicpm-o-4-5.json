@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "page_slug": "minicpm-o-4-5",
+  "source_version": "arXiv v1",
+  "blocks": {
+    "摘要翻译": "section-abstract-8a34f1",
+    "问题空间": "section-problem-19c2de",
+    "问题空间 / 从流式生成到交互闭环": "section-streaming-boundaries-2f01ab",
+    "问题空间 / 相关路线与本文位置": "section-prior-routes-6a35dd",
+    "问题空间 / 证据责任": "section-evidence-duty-b94ae7",
+    "观察与核心 idea": "section-core-idea-31fd6c",
+    "观察与核心 idea / 三条共享时间轴上的流": "section-three-streams-c7e108",
+    "观察与核心 idea / 主动性来自协议与数据，不会由架构自动产生": "section-proactivity-e0bd52",
+    "方法": "section-method-47dc20",
+    "方法 / Problem setting 与完整信息流": "section-pipeline-66b9a3",
+    "方法 / 视觉、音频与语音侧的速率分工": "section-rate-separation-d2af84",
+    "方法 / Listen–Speak 控制与边界": "section-listen-speak-0ee6d1",
+    "方法 / TAIL：自适应的是每窗文本量": "section-tail-adaptation-35cfd8",
+    "方法 / TAIL 的训练与推理": "section-tail-training-9281ea",
+    "方法 / 四阶段训练": "section-four-stage-training-61e2cb",
+    "实验与论证": "section-evaluation-a35f1e",
+    "实验与论证 / 一秒显式分组与 Listen–Speak 是否合理": "section-ablation-4cf80b",
+    "实验与论证 / Full-duplex 主结果实际测到了什么": "section-full-duplex-evidence-b5d601",
+    "实验与论证 / TAIL 是否真的改善了时间同步": "section-tail-evidence-9f6c33",
+    "实验与论证 / 运行时是否跟得上现实时间": "section-runtime-7d4a90",
+    "贡献与边界": "section-contribution-3a9df0",
+    "贡献与边界 / 可信贡献": "section-credible-contribution-41e8b7",
+    "贡献与边界 / 最脆弱的假设": "section-fragile-assumption-ef2c16",
+    "贡献与边界 / 作者承认与本文补充的局限": "section-limitations-8c10de",
+    "研究响应": "section-response-095feb",
+    "研究响应 / Takeaways": "section-takeaways-d4418c",
+    "研究响应 / 一周最小复现": "section-minimal-replication-fab2c7",
+    "研究响应 / 反例设计": "section-counterexample-30c5aa",
+    "研究响应 / 后续研究与新认知": "section-later-work-581d94",
+    "研究响应 / Follow-up idea：Playback-Aware TAIL": "section-playback-aware-tail-ca46e9",
+    "与 Wiki 的连接": "section-wiki-links-3d9f10",
+    "来源与证据边界": "section-sources-717b4d"
+  },
+  "claims": [
+    {
+      "id": "claim-omni-flow-serialization",
+      "block_id": "section-three-streams-c7e108",
+      "claim_type": "author",
+      "verification_status": "verified",
+      "summary": "Omni-Flow 将环境视觉、环境音频和助手输出按共享时间窗组成序列，使当前输出条件化于最新感知。",
+      "anchors": [
+        {
+          "kind": "section",
+          "label": "Sections 3.1–3.2",
+          "source_url": "https://arxiv.org/abs/2604.27393"
+        },
+        {
+          "kind": "page",
+          "label": "PDF p.5",
+          "source_url": "https://arxiv.org/pdf/2604.27393"
+        }
+      ]
+    },
+    {
+      "id": "claim-tail-boundary-supervision",
+      "block_id": "section-tail-adaptation-35cfd8",
+      "claim_type": "author",
+      "verification_status": "verified",
+      "summary": "TAIL 按文本 token 的发音开始时间构造变长时间窗监督，并根据累计播放进度调整每窗文本量。",
+      "anchors": [
+        {
+          "kind": "section",
+          "label": "Section 3.4",
+          "source_url": "https://arxiv.org/abs/2604.27393"
+        },
+        {
+          "kind": "figure",
+          "label": "Figure 5",
+          "source_url": "https://arxiv.org/pdf/2604.27393"
+        }
+      ]
+    },
+    {
+      "id": "claim-tail-autoregressive-boundary",
+      "block_id": "section-tail-training-9281ea",
+      "claim_type": "analysis",
+      "verification_status": "verified",
+      "summary": "公开论文与官方推理协议共同支持：TAIL 在线动态长度由自回归 boundary token 决定，未见独立长度预测器或显式时延控制器。",
+      "anchors": [
+        {
+          "kind": "section",
+          "label": "Sections 3.2, 3.4 and 5.2",
+          "source_url": "https://arxiv.org/abs/2604.27393"
+        },
+        {
+          "kind": "text",
+          "label": "Official model repository streaming inference implementation, accessed 2026-10-14",
+          "source_url": "https://huggingface.co/openbmb/MiniCPM-o-4_5"
+        }
+      ]
+    },
+    {
+      "id": "claim-one-second-ls-ablation",
+      "block_id": "section-ablation-4cf80b",
+      "claim_type": "experiment",
+      "verification_status": "verified",
+      "summary": "在论文测试的设置中，1.0 秒、显式边界、Listen–Speak 配置整体最稳定，但实验不是完整正交消融。",
+      "anchors": [
+        {
+          "kind": "table",
+          "label": "Table 1",
+          "source_url": "https://arxiv.org/pdf/2604.27393"
+        }
+      ]
+    },
+    {
+      "id": "claim-full-duplex-benchmark-vision-only",
+      "block_id": "section-full-duplex-evidence-b5d601",
+      "claim_type": "experiment",
+      "verification_status": "verified",
+      "summary": "MiniCPM-o 4.5 在 LiveSports-3K-CC 得到 54.4 win rate，但该 full-duplex benchmark 无音频，只直接支持连续视觉交互。",
+      "anchors": [
+        {
+          "kind": "table",
+          "label": "Table 8",
+          "source_url": "https://arxiv.org/pdf/2604.27393"
+        },
+        {
+          "kind": "section",
+          "label": "Section 6.5",
+          "source_url": "https://arxiv.org/abs/2604.27393"
+        }
+      ]
+    },
+    {
+      "id": "claim-tail-quality-not-alignment",
+      "block_id": "section-tail-evidence-9f6c33",
+      "claim_type": "experiment",
+      "verification_status": "verified",
+      "summary": "Table 10 显示 TAIL 中文 CER 1.04、英文 WER 3.93；它测量语音质量而未测量播放积压或时间同步收益。",
+      "anchors": [
+        {
+          "kind": "table",
+          "label": "Table 10",
+          "source_url": "https://arxiv.org/pdf/2604.27393"
+        }
+      ]
+    },
+    {
+      "id": "claim-runtime-real-time",
+      "block_id": "section-runtime-7d4a90",
+      "claim_type": "experiment",
+      "verification_status": "verified",
+      "summary": "llama.cpp-omni INT4 在 RTX 4090 与 DGX Spark 上分别报告 0.21 和 0.20 RTF，内存均为 11 GB。",
+      "anchors": [
+        {
+          "kind": "table",
+          "label": "Table 12",
+          "source_url": "https://arxiv.org/pdf/2604.27393"
+        }
+      ]
+    },
+    {
+      "id": "claim-open-loop-risk",
+      "block_id": "section-fragile-assumption-ef2c16",
+      "claim_type": "analysis",
+      "verification_status": "verified",
+      "summary": "若模型看不到真实播放器状态，离线时间戳监督与生成历史不足以保证设备或网络抖动后的长期闭环同步。",
+      "anchors": [
+        {
+          "kind": "section",
+          "label": "Section 3.4 and Section 8 limitations",
+          "source_url": "https://arxiv.org/abs/2604.27393"
+        },
+        {
+          "kind": "table",
+          "label": "Tables 10 and 12",
+          "source_url": "https://arxiv.org/pdf/2604.27393"
+        }
+      ]
+    }
+  ]
+}
