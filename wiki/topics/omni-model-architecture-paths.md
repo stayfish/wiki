@@ -41,9 +41,9 @@ Gemini 1.5 代表将音视频直接扩展到百万 token 上下文的路线。Qw
 
 ### 持续交互协议
 
-[[minicpm-o-4-5]] 把视觉环境、音频环境和助手输出按共享时间窗序列化，并让模型用 Listen/Speak token 决定每窗是否开口。TAIL 再用发音时间戳构造变长文本块，使自回归 boundary 控制每个语音时间格承诺多少文字。它统一的是持续交互协议，而非新的模态 embedding 或 tokenization。
+[[minicpm-o-4-5]] 把视觉环境、音频环境和助手输出按约一秒一个 `chunk` 接成序列。每个 `chunk` 到来时，模型先读入新的视觉和音频，再用 Listen/Speak token 决定是否开口。TAIL 根据发音时间戳制作长短不同的文本标签，推理时由自回归 `boundary token` 决定当前 `chunk` 生成几个 text token。它统一的是持续交互协议，而非新的模态 embedding 或 tokenization。
 
-这一层与 Thinker–Talker 正交：一个模型可以流式接收音视频、流式产生语音，却仍然只在用户 turn 结束后回答。全双工还要求新输入在输出期间进入控制闭环，运行时能取消过期内容，并让真实播放进度长期贴近环境墙钟。[[full-duplex-timing-attribution]] 记录当前无法从通用 benchmark、RTF 或语音可懂度中单独归因的部分。
+这一层与 Thinker–Talker 正交：一个模型可以流式接收音视频、流式产生语音，却仍然只在用户 turn 结束后回答。full-duplex 还要求模型说话时继续读取新输入，运行时能取消已经过时的内容，并避免真实播放进度逐渐落后于外部环境。[[full-duplex-timing-attribution]] 记录当前无法从通用 benchmark、RTF 或语音可懂度中判断的部分。
 
 ### 与架构正交的数据与评测闭环
 
@@ -58,7 +58,7 @@ Gemini 1.5 代表将音视频直接扩展到百万 token 上下文的路线。Qw
 | Chameleon | 图文早期融合 token | 图文交错理解与生成 | 模态覆盖不等于完整 Omni |
 | Gemini 1.5 | 长上下文中的多模态信息 | 可处理超长音视频 | 装得下不等于推理或检索可靠 |
 | Qwen-Omni | 专用 Encoder + 共享 Thinker | 易继承语言推理和实时语音 | 视觉输出依赖外部工具 |
-| MiniCPM-o 4.5 | 共享时间窗中的感知、控制与输出 | 持续视觉/音频输入、主动输出、端侧实时运行 | 一秒离散粒度；同步和打断证据不足 |
+| MiniCPM-o 4.5 | 共享 `chunk` 中的感知、控制与输出 | 持续视觉/音频输入、主动输出、端侧实时运行 | 一秒离散粒度；同步和打断证据不足 |
 | Omni Agent 栈 | 模型、工具与 Harness | 能主动取证并改变环境 | 贡献归因、成本和可靠性更复杂 |
 | OmniVChat 数据与 RL | 渲染事实、rubric 与回复策略 | 可规模化开放式音视频对话训练和评测 | 训练—评测耦合，grounding 归因不足 |
 
@@ -71,7 +71,7 @@ Gemini 1.5 代表将音视频直接扩展到百万 token 上下文的路线。Qw
 - 开放式 rubric 能容许多种正确措辞，但 criterion 遗漏、tier gate 和训练 judge 复用会把标注误差放大为系统性评分偏差。
 - 冻结音视频 tower 后的回复策略增益不能自动归因于更强感知；需要比较训练前后的模态干预敏感性。
 - RTF 小于 1 只说明计算吞吐能跟上现实时间，不能证明助手输出使用的是最新环境状态。
-- 离线时间戳和自回归边界可以学习平均调度；若模型看不到真实播放器队列，网络或设备抖动后的闭环恢复仍未知。
+- 离线时间戳和自回归 boundary 可以学到平均说话节奏；若模型看不到真实播放器 queue，网络或设备抖动后能否自行恢复仍未知。
 
 ## 我的判断
 
@@ -87,7 +87,7 @@ Gemini 1.5 代表将音视频直接扩展到百万 token 上下文的路线。Qw
 4. Gemini 1.5：百万 token 多模态上下文；
 5. [[qwen2-5-omni|Qwen2.5-Omni]]：已完成；Thinker–Talker、TMRoPE 与实时语音；
 6. [[minicpm-o-4-5]]：已完成；共享时间轴、Listen/Speak 与 TAIL；
-7. Moshi：用并行语音流对照显式时间窗协议；
+7. Moshi：用并行语音流对照显式 `chunk` 协议；
 8. Qwen3.5-Omni：长音视频、时间对齐和 ARIA；
 9. [[omnivchat]]：已完成；数据合成、分层 rubric、开放式评测与 GSPO 回复策略；
 10. 回看 [[qwen3-8-omni]]，区分继承与新增部分。

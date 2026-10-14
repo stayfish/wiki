@@ -73,7 +73,7 @@ Agent 会为同一篇论文或研究线程维护一个本地 session，把每轮
 回顾最近五次阅读：哪些结论变强了，哪些仍有冲突，下一步该读什么？
 ```
 
-完整规则见 [`schema/SCHEMA.md`](./schema/SCHEMA.md) 和 [`schema/conversation.md`](./schema/conversation.md)。
+完整规则见 [`schema/SCHEMA.md`](./schema/SCHEMA.md)、[`schema/conversation.md`](./schema/conversation.md) 和 [`schema/writing.md`](./schema/writing.md)。
 
 Session 页面可手动重建。指定路径用于校验目标 session，渲染器会同步刷新所有对话页与总览，避免跨 session 导航过期：
 

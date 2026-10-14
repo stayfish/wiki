@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-10-14] lint | 建立问题驱动的中文技术写作 workflow
+
+- 新增统一写作规范，让对话回答与 Wiki 页面都从具体问题出发，沿“直接做法、缺口、设计、行为、证据边界”展开；把术语选择、公式引入、实验论证和两遍修订写成可执行检查项。
+- 将语言偏好同步到仓库入口、总 schema、对话流程、deepnote 模板、读者偏好与使用说明；原词比直译自然时保留 `chunk`、`window`、`token`、`boundary token` 等术语。
+- 按新 workflow 重写 MiniCPM-o 4.5 deepnote 的问题引入、Omni-Flow、Resampler、TAIL、实验和局限，并同步 evidence sidecar、全双工时序线索与全模态架构主题。
+- 保留原有数字、来源、稳定 block ID 与 claim 状态；语言修订没有补写论文未披露的训练细节，也没有加强原有结论。
+
 ## [2026-10-14] ingest | 补充 MiniCPM-o 4.5 关键方法图
 
 - 根据用户明确许可，从已核验 PDF 以 300 dpi 截取 Figure 3、Figure 4 与 Figure 5 的图形主体，排除原始 caption 和周围正文。

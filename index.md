@@ -4,7 +4,7 @@
 
 - [[qwen2-5-omni]] — 从 Thinker–Talker、TMRoPE 与流式处理理解 Qwen 全模态路线的基础架构。
 - [[qwen3-8-omni]] — 从语音与空间音频编码、长上下文训练到全模态 Agent 系统的完整阅读笔记。
-- [[minicpm-o-4-5]] — 从 Omni-Flow 的共享时间轴、TAIL 的动态边界和实验缺口理解实时全模态交互。
+- [[minicpm-o-4-5]] — 解释模型怎样一边听一边说，以及 TAIL 如何用 `boundary token` 决定每个 `chunk` 生成多少文字。
 - [[omnivchat]] — 从合成数据、证据回标、分层 Rubric 与 GSPO 理解原生音视频对话的训练评测闭环。
 
 ## Glances · 简单总结

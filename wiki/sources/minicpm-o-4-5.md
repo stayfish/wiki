@@ -1,8 +1,8 @@
 ---
-title: MiniCPM-o 4.5：把全双工交互编译成时间序列
+title: MiniCPM-o 4.5：模型怎样一边听一边说
 slug: minicpm-o-4-5
 type: deepnote
-summary: 从 Omni-Flow 的共享时间轴、TAIL 的动态边界和实验缺口理解实时全模态交互。
+summary: 从一个具体问题出发：模型说话时怎样继续接收新信息，又怎样避免待播放的语音越积越多。
 updated: 2026-10-14
 accent: brick
 source_kind: paper
@@ -12,7 +12,7 @@ read_scope: full-text
 status: reviewed
 ---
 
-# MiniCPM-o 4.5：把全双工交互编译成时间序列
+# MiniCPM-o 4.5：模型怎样一边听一边说
 
 ## 摘要翻译
 
@@ -28,38 +28,40 @@ MiniCPM-o 4.5 总参数量为 9B，其视觉语言能力接近 Gemini 2.5 Flash�
 
 ### 从流式生成到交互闭环
 
-论文把瓶颈从“能接收哪些模态、多久开始回答”推进到“回答期间能否继续感知，并据此改变行为”。作者将现有范式的失败压缩成两项：感知与输出交替发生造成的阻塞式输入输出，以及只有收到明确请求才回答的被动响应。
+先想一个最简单的场景：助手正在根据镜头描述桌上的物品，用户突然说“不是红色那个，是旁边蓝色的”。如果系统只能等自己说完再处理这句话，那么它即使逐字播报、首字延迟很低，也仍然不是本文所说的 full-duplex。真正的问题是：**助手开口以后，新到的画面和声音能不能继续进入下一步决策，并让它停下、改口或保持沉默。**
+
+论文因此把重点从“能接收哪些模态、多久开始回答”推进到“感知和输出能否持续互相影响”。作者认为现有系统主要卡在两处：听和说仍被排成相邻阶段；模型通常只在收到明确请求后回应，不会根据持续变化的环境主动开口。
 
 ![从轮次式交互到全双工流式交互](../../assets/papers/minicpm-o-4-5/figure-3-turn-based-vs-full-duplex.png "论文原图编号：Figure 3。传统流式范式把感知和说话分成相邻阶段，作者目标则让两者在时间上重叠；这张图用于界定问题，不是方法有效性的实验结果。")
 
-这要求区分四个常被混用的概念：
+这里有四个容易混在一起的概念：
 
 - **流式输入**表示音频或视频未结束时就分块编码；
 - **流式输出**表示完整回复尚未生成完就开始交付文字或音频；
 - **实时**表示计算吞吐能够跟上现实时间，语音系统常用 $\mathrm{RTF}=\text{处理耗时}/\text{音频时长}$ 衡量；
-- **交互式全双工**要求助手输出期间的新输入进入同一决策闭环，并能改变它继续说、停止、修正或保持沉默的行为。
+- **交互式 full-duplex**要求助手输出期间的新输入继续进入决策，并能改变它接下来是继续说、停止、修正还是沉默。
 
-前三项同时成立，系统仍可能是轮次式的。真正区分全双工的测试是：助手已经开口后改变画面或插入用户语音，后续输出是否在正确时机使用了新信息。
+前三项同时成立，系统仍可能是轮次式的。最直接的检验方法仍是刚才那个场景：助手已经开口后改变画面或插入一句话，后续输出有没有及时使用新信息。
 
-VAD（语音活动检测）只判断当前有没有人声，ASR（自动语音识别）把语音波形转成文字。传统语音助手常采用 `VAD → ASR → 文本 LLM → TTS`，外部状态机负责话轮、取消和打断。MiniCPM-o 4.5 并不意味着这些前端工程问题全部消失；它主要把一部分“何时听、何时说”的控制决策移进模型序列。
+VAD（Voice Activity Detection）只判断当前有没有人声，ASR（Automatic Speech Recognition）把语音波形转成文字。传统语音助手常采用 `VAD → ASR → 文本 LLM → TTS`：外部状态机先判断用户是否说完，再启动识别、回答和播音。MiniCPM-o 4.5 没有让回声消除、取消播放等工程问题凭空消失；它做的是把一部分“现在该听还是该说”的决定放进模型自己生成的序列里。
 
 ### 相关路线与本文位置
 
 [[qwen2-5-omni|Qwen2.5-Omni]] 的 Thinker–Talker 已能分块编码音视频，并让文字与语音流式输出，但流式输入和流式输出并不自动形成持续的交互协议。Moshi 更早直接建模用户与助手两条并行语音流，可表达重叠说话、插话和附和；它主要处理语音—语音交互，没有视觉环境流。Freeze-Omni 也已使用按块状态预测处理打断。
 
-因此，作者所称“首个全双工全模态大模型”应保留为作者的优先权声明。本文较可信的知识增量是：把连续视觉、环境音频、文字和语音输出统一到共享时间轴，并以显式控制 token 表达主动输出，同时把完整系统压到端侧可运行的规模。
+因此，“首个全双工全模态大模型”只能作为作者的优先权声明保留。更稳妥的贡献是：论文给连续视觉、环境音频、文字和语音输出规定了一套共同的时间组织方式，再用显式 control token 表示听或说，并把整条链压到端侧可以运行的规模。
 
-### 证据责任
+### 要用什么证据检验它
 
-把论文目标拆开后，至少要分别检查：模型是否理解最新音视频、是否在合适时机听或说、内容是否随新环境更新、语音是否及时且稳定、运行时是否跟得上现实时间。普通视觉问答、ASR、TTS 或单轮音视频 benchmark 只能验证其中一部分，不能合并成全双工结论。
+要证明这个系统真的能一边听一边说，至少要分别回答五件事：它有没有读到最新音视频；什么时候选择开口；环境改变后内容会不会更新；已经排队的旧语音能不能及时停下；计算速度能不能跟上现实时间。普通视觉问答、ASR、TTS 或单轮音视频 benchmark 各自只能覆盖其中一部分，把这些分数加在一起也不能自动推出 full-duplex 已经成立。
 
 ## 观察与核心 idea
 
 ### 三条共享时间轴上的流
 
-Omni-Flow 将连续交互分为三条流：环境视觉 `env-visual`、环境音频 `env-audio` 与助手输出 `out-stream`。用户请求不再是必须先结束的特殊 turn，而是环境音频中的事件；模型在每个时间窗都要决定是否输出。
+Omni-Flow 的做法并不复杂：它把连续交互写成三条按时间前进的 stream，即环境视觉 `env-visual`、环境音频 `env-audio` 和助手输出 `out-stream`。用户请求只是环境音频中发生的一件事，不再是一个必须先完整结束的特殊 turn。每过一个 `chunk`，模型都会收到这一小段的新画面和新声音，然后决定这次保持 `[listen]`，还是生成 `[speak]` 和后续内容。
 
-设窗口宽度为 $t$，第 $k$ 个窗口的视觉、音频和输出 token 分别为 $\mathbf v_k$、$\mathbf a_k$、$\mathbf o_k$，则论文把它们组成
+如果一个 `chunk` 覆盖 $t$ 秒，第 $k$ 个 `chunk` 中的视觉、音频和输出 token 分别记作 $\mathbf v_k$、$\mathbf a_k$、$\mathbf o_k$，论文把它们接成
 
 $$
 \mathbf g_k=[\mathbf v_k;\mathbf a_k;\mathbf o_k],
@@ -67,14 +69,14 @@ $$
 \mathbf G=[\mathbf g_1;\mathbf g_2;\ldots;\mathbf g_K].
 $$
 
-当前窗先写入新到达的感知 token，再生成输出 token；不该输出时，$\mathbf o_k$ 只包含 `[listen]`。这样，标准因果语言模型可以用时间分片模拟物理世界中同时发生的看、听和说。
+在每个 `chunk` 里，模型先看到新到的感知 token，再生成输出 token；不该说话时，$\mathbf o_k$ 只有 `[listen]`。因此模型不需要真的在同一个计算瞬间同时运行三条网络，它只要反复执行“读入这一秒的新信息，再决定这一秒说什么”即可。
 
 ```text
-窗口 k：   新视觉 + 新环境音频 → listen / speak → 本窗输出
-窗口 k+1：新视觉 + 新环境音频 → listen / speak → 更新后的输出
+chunk k：   新视觉 + 新环境音频 → listen / speak → 当前输出
+chunk k+1：新视觉 + 新环境音频 → listen / speak → 根据新信息更新输出
 ```
 
-这是时间分复用对全双工的离散近似，不是三个神经网络真的在同一瞬间计算。窗口越短，新环境进入决策越快；但边界 token、缓存切换和上下文不足会更严重。论文最终选择 1 秒窗，意味着它追求的是一秒级刷新下的工程平衡，而非 Moshi 式几十毫秒话轮协调。
+这是一种离散近似：`chunk` 越短，新环境越快进入决策，但模型也会更频繁地处理边界，单个 `chunk` 中可用的上下文更少。论文最终选择约 1 秒的 `chunk`，追求的是一秒级更新下的工程平衡；它没有做到 Moshi 那种几十毫秒粒度的话轮协调。
 
 ### 主动性来自协议与数据，不会由架构自动产生
 
@@ -84,7 +86,7 @@ Omni-Flow 允许没有显式请求时仍预测 `[speak]`，所以主动提醒可
 
 ### Problem setting 与完整信息流
 
-每个窗口，模型接收截至当前的视觉和环境音频、历史输出与系统提示，先预测 Listen–Speak 控制，再在说话时生成可变数量的文本。轻量语音 decoder 根据文本 token 与语言模型 hidden state 生成离散语音 token，最后由流式 flow-matching decoder 还原波形。
+每个 `chunk` 到来时，模型拿到最新的视觉、环境音频、此前输出和系统提示。它先决定 `[listen]` 还是 `[speak]`；选择说话后，再生成数量不固定的 text token。随后一个轻量 speech-token decoder 读取这些 text token 和语言模型的 hidden state，生成离散 speech token；流式 flow-matching decoder 最后把它们还原成可以播放的波形。
 
 ```text
 视频帧 → SigLIP ViT → Visual Resampler ┐
@@ -100,51 +102,53 @@ Omni-Flow 允许没有显式请求时仍预测 `[speak]`，所以主动提醒可
 
 ### 视觉、音频与语音侧的速率分工
 
-视觉侧将每个切片的 1024 个 SigLIP patch token 通过可学习 Resampler 压到 64 个，压缩率为 16 倍。Resampler 可理解为 64 个可学习 query 通过交叉注意力读取 1024 个局部特征，而非简单抽样或平均池化。全双工模式还把最大分辨率限制为 $448\times448$；普通模式可到 $2240\times2240$。这用细节损失换取持续视频输入的上下文和计算预算。
+持续视频最先遇到的问题是 token 太多。每个图像切片原本会产生 1024 个 SigLIP patch token，Visual Resampler 用 64 个可学习 query 通过 cross-attention 去读取它们，最终只输出 64 个 token。它不是简单抽取 64 个 patch，也不是平均池化；这些 query 会学着从整张特征图中取出后续任务需要的信息。full-duplex 模式还把最大分辨率限制为 $448\times448$，普通模式则可到 $2240\times2240$。这里的取舍很直接：少保留一些空间细节，换来持续视频所需的上下文和计算预算。
 
-音频侧用 Whisper Medium encoder 分块编码，每秒产生 50 个 feature token，再由两层 MLP 压到每秒 10 个音频 token。它使用 Whisper 的声学表征，但没有先产生一份定稿 ASR 文本；声学信息可直接参与控制和内容预测。
+音频侧用 Whisper Medium encoder 分块编码，每秒先产生 50 个 feature token，再由两层 MLP 压到每秒 10 个 audio token。这里借用的是 Whisper 的声学表示，系统没有先等 ASR 产出一份定稿文字；原始声学信息可以直接影响模型是听、说，或者接下来生成什么。
 
-Qwen3-8B 只在文本域以约每秒 3–4 个解码步工作。约 0.3B 的轻量 Llama speech-token decoder 承担 25 Hz 的 S3 语音 token 生成。对每个文本 token，语言 hidden state 经 $4096\rightarrow768$ 投影后与语音 decoder 的文本 embedding 合并，使大模型负责低频语义与控制，小模型负责高频声学细节。最后，流式 flow-matching decoder 将 S3 token 转成波形。
+如果让 8B LLM 直接以 25 Hz 生成语音，计算会很贵。论文让 Qwen3-8B 只在文本侧以约每秒 3–4 步工作，再把它的 hidden state 从 $4096$ 维投影到 $768$ 维，与 text embedding 一起交给约 0.3B 的 Llama speech-token decoder。于是大模型负责变化较慢的语义和控制，小模型负责以 25 Hz 生成 S3 speech token，最后再转成波形。
 
 ### Listen–Speak 控制与边界
 
-Listen–Speak（LS）先预测二元控制，再在选择说话后生成内容；Listen–Text（LT）让 `[listen]` 与普通文字在同一输出空间直接竞争。LS 可写成解释性的分层分解：
+模型每个 `chunk` 都要面对一个问题：现在不说话，还是开始生成内容？Listen–Speak（LS）先单独预测这个二元选择，再在 `[speak]` 之后生成文字；Listen–Text（LT）则让 `[listen]` 直接和普通 text token 在同一个输出空间里竞争。LS 可以写成下面的分层形式：
 
 $$
 p(c_k,y_k\mid h_k)
 =p(c_k\mid h_k)\,p(y_k\mid c_k,h_k),
 $$
 
-其中 $c_k\in\{\text{listen},\text{speak}\}$，$h_k$ 是当前多模态历史。论文的 Table 1 支持 LS 在已测试配置中更稳定，但该表没有覆盖所有正交组合，不能精确分离控制形式、边界和窗口大小各自的净贡献。
+其中 $c_k\in\{\text{listen},\text{speak}\}$，$h_k$ 是当前多模态历史。论文的 Table 1 支持 LS 在已测试配置中更稳定，但该表没有覆盖所有正交组合，不能精确分离控制形式、边界和 `chunk` 长度各自的净贡献。
 
-### TAIL：自适应的是每窗文本量
+### TAIL：每个 `chunk` 该生成多少文字
 
-普通流式语音要么让一大段文本领先播放，要么按固定文本—语音 token 比例交错。前者会在环境变化后继续播放旧计划；后者假设每个文本 token 对应近似固定的发音时长，无法吸收语言、标点、语速和停顿造成的累计漂移。
+TAIL 要解决的不是“能不能流式播音”，而是一个更具体的问题：**每过一秒，LLM 应该提前生成多少 text token？**
 
-![非交错、固定比例与 TAIL 的时间关系](../../assets/papers/minicpm-o-4-5/figure-5-tail.png "论文原图编号：Figure 5。图中比较长文本前置、固定文本—语音比例和按时间窗动态分配文本的 TAIL，并标出有限前瞻；它解释方法动机，但没有提供播放漂移的实测曲线。")
+一种做法是先生成很长一段文字，再让 TTS 慢慢播放。这样一旦画面变化或用户插话，播放器里还排着很多旧内容。另一种做法是固定按 $N$ 个 text token 搭配一段 speech token。问题是，token 数不等于发音时长：“AI”与一个长英文单词可能都是少量 token，标点、语速和停顿也会改变实际时长。固定比例跑得越久，模型内部的文字进度与真实说话进度越容易错开。
 
-Time-Aligned Interleaving（TAIL）固定近似一秒的语音时间格，却允许该时间格承载可变数量的文本。若前面说得慢、播放已落后，当前窗应少承诺一些新文字。关键不是一个新的 duration head，而是训练标签怎样构造。
+![非交错、固定比例与 TAIL 的时间关系](../../assets/papers/minicpm-o-4-5/figure-5-tail.png "论文原图编号：Figure 5。图中比较长文本前置、固定文本—语音比例和每个 chunk 使用不同文本量的 TAIL，并标出有限 look-ahead；它解释方法动机，但没有测量待播放语音会不会随时间增加。")
 
-对每个文本 token $y_i$，训练数据提供发音开始时间 $s_i$。窗口宽度为 $t$ 时，第 $k$ 窗的文本目标为
+Time-Aligned Interleaving（TAIL）保留约一秒一个 `chunk` 的节奏，但每个 `chunk` 允许包含不同数量的 text token。说得快的一秒可以放得多，长词或停顿较多的一秒就放得少。论文没有另外训练一个 duration head；所谓“自适应”来自训练数据怎样放置 `boundary token`，以及模型在推理时何时把这个 token 生成出来。
+
+具体来说，每个 text token $y_i$ 都有发音开始时间 $s_i$。当 `chunk` 宽度为 $t$ 时，第 $k$ 个 `chunk` 收下所有开始时间落在该区间的 token：
 
 $$
 T_k=\{y_i\mid s_i\in[(k-1)t,kt)\}.
 $$
 
-对应的语音 token 也被分到该窗。由于真实发音时长不同，$|T_k|$ 自然可变；每组文字后插入 chunk boundary。LLM 使用普通 next-token loss 学习这个边界：
+对应的 speech token 也按时间分到这个 `chunk`。因为一秒内实际能说出的文字量会变化，$|T_k|$ 自然不是常数。数据构造器在这组文字末尾插入 `chunk_eos`，LLM 仍然使用普通 next-token loss：
 
 $$
 \mathcal L_{\mathrm{LLM}}
 =-\sum_m\log p(Z_{k,m}\mid Z_{<k},Z_{k,<m},X_{\le k}),
 $$
 
-其中 $Z_k=(\texttt{speak},y_1,\ldots,y_{n_k},\texttt{chunk\_eos})$。推理时，`<|chunk_eos|>` 与普通文本 token 在每一步的词表 softmax 中竞争；它首次被选中的位置就是当前窗的动态长度：
+其中 $Z_k=(\texttt{speak},y_1,\ldots,y_{n_k},\texttt{chunk\_eos})$。到了推理时，模型事先不知道当前 `chunk` 应该有几个 text token。它逐 token 生成，每一步都让 `<|chunk_eos|>` 与普通词竞争；第一次生成 `<|chunk_eos|>`，当前 `chunk` 就结束：
 
 $$
-n_k=\text{第 }k\text{ 窗首次生成 boundary 前的普通文本 token 数}.
+n_k=\text{第 }k\text{ 个 chunk 首次生成 boundary 前的普通 text token 数}.
 $$
 
-所以，用户在讨论中形成的判断是准确的：**在线阶段的动态长度核心就是自回归预测 boundary token。** TAIL 的技术增量主要在时间戳产生的变长监督、跨窗历史、近固定语音预算和有限前瞻，而非额外的长度预测网络。
+所以，本次讨论得到的理解是对的：**在线阶段的动态长度，核心就是自回归预测 `boundary token`。** 其余设计没有再提供一个神秘的自适应控制器；它们负责让这个简单机制能够工作，包括时间戳生成的变长标签、跨 `chunk` 历史、近固定的 speech-token 预算和少量未来文字。
 
 ### TAIL 的训练与推理
 
@@ -152,16 +156,16 @@ $$
 
 | 训练时 | 推理时 |
 | --- | --- |
-| 时间戳决定第 $k$ 窗含 $n_k$ 个文字 token | 模型不知道 $n_k$，逐 token 生成 |
+| 时间戳决定第 $k$ 个 `chunk` 含 $n_k$ 个 text token | 模型不知道 $n_k$，逐 token 生成 |
 | 在第 $n_k+1$ 个位置放 chunk boundary | 每步让 boundary 与普通文字竞争 |
 | teacher forcing 提供正确历史 | 使用自己的边界历史与 KV cache |
-| 对应 speech token 作为该窗语音目标 | speech decoder 生成约一秒语音 token |
+| 对应 speech token 作为该 `chunk` 的语音目标 | speech decoder 生成约一秒的 speech token |
 
-论文没有单独定义 `TAIL loss`。边界 token 的交叉熵属于统一 next-token objective；speech decoder 学习在文本 embedding、LLM hidden state 与历史语音 token 条件下预测下一 S3 token。TAIL 主要在 joint pretraining 的时间对齐 full-duplex 数据中学得，joint SFT 继续细化交互。论文的 GRPO 与 RLAIF-V 没有给出播放滞后或边界准确率 reward，不能把 TAIL 归因于 RL。
+论文没有单独定义一个 `TAIL loss`。`boundary token` 和普通 token 一样接受 next-token cross-entropy；speech decoder 则根据 text embedding、LLM hidden state 和历史 speech token 预测下一个 S3 token。TAIL 主要在 joint pretraining 的时间对齐 full-duplex 数据中学到，joint SFT 再细化交互。后面的 GRPO 与 RLAIF-V 没有使用“待播放语音长度”或 boundary 准确率作为 reward，因此不能说 TAIL 的动态长度是 RL 学出来的。
 
-TAIL 还允许把窗口末尾少量文本对应的语音推迟到下一窗，以获得局部未来文字，改善依赖后词的发音和韵律。论文没有披露具体延后几个文本 token。官方推理代码另有 3 个 S3 token、约 120 ms 的声学前瞻；这是波形分块连续性机制，不能当成 TAIL 文本前瞻的数值。
+TAIL 还允许把 `chunk` 末尾少量文字对应的语音推迟到下一个 `chunk`，让 speech decoder 多看到一点未来文字，从而改善依赖后词的发音和韵律。论文没有说明究竟延后几个 text token。官方推理代码里另有 3 个 S3 token、约 120 ms 的声学 look-ahead，但它服务于波形分块的连续性，不能拿来填补论文没有披露的 TAIL 文本 look-ahead。
 
-公开推理实现进一步显示：duplex unit 默认约 1 秒，常规窗约生成 25 个 25 Hz S3 token；LLM 侧默认最多生成 20 个 speak-side token，若始终未产生边界则强制结束。这一上限是防失控 guardrail，不是 TAIL 的自适应机制。
+公开推理实现进一步显示：duplex unit 默认约 1 秒，普通 `chunk` 大约生成 25 个 25 Hz S3 token；LLM 一侧最多允许生成 20 个 speak-side token，如果一直没有生成 boundary，就会被强制截断。这个上限只是防止模型失控的 guardrail，不是 TAIL 自适应长度的来源。
 
 ### 四阶段训练
 
@@ -186,13 +190,13 @@ Table 1 的关键结果如下：
 | 0.2 s | Explicit | LS | 0.81 | 1.22 | 0.10 | 0.09 | 0.45 |
 | 0.1 s | Explicit | LS | 0.67 | 2.40 | 0.10 | 0.13 | 0.32 |
 
-更短窗口在多项指标上显著退化，支持作者选择一秒窗；同为一秒 LT 时，显式边界优于隐式；同为一秒显式时，LS 除 AlpacaEval 外优于 LT。由于缺少 `Implicit + LS` 等组合，这只是配置选择证据，不是完整因果消融。表中的 group boundary 也不是专门检验 TAIL 动态文本边界。
+这张表回答的是“怎样切 `chunk`、怎样表示听或说，哪组配置更稳”。把 `chunk` 从 1 秒缩到 0.2 或 0.1 秒后，多项指标明显下降；在同为 1 秒的设置里，显式边界优于隐式边界，LS 除 AlpacaEval 外也优于 LT。因此作者选择了 `1.0 s + Explicit + LS`。不过表中缺少 `Implicit + LS` 等组合，无法把收益精确归因到单一因素；这里的 group boundary 也不是专门检验 TAIL 的动态文本边界。
 
 ### Full-duplex 主结果实际测到了什么
 
-Tables 2–7 说明模型的视觉、音频、文字和单轮音视频能力具有竞争力，Table 7 甚至明确属于 simplex setting。这些结果证明底座没有因为统一训练而全面崩塌，不证明同时听说的控制质量。
+Tables 2–7 主要在回答“统一训练以后，原有的视觉、音频、文字和单轮音视频能力有没有明显损坏”。结果说明底座仍有竞争力，Table 7 甚至明确属于 simplex setting；它们没有直接测试模型能否一边听一边说。
 
-Table 8 是论文唯一量化的 full-duplex benchmark：MiniCPM-o 4.5 在 LiveSports-3K-CC 的 win rate 为 54.4，高于 StreamingVLM 的 45.6 和 LiveCC 的 41.5。但该 benchmark 是无音频的连续视觉任务。它支持“模型能在持续画面中生成更合适的描述”，不能验证助手说话时继续听见用户、处理插话或维持视听语音三流同步。
+Table 8 是论文唯一量化的 full-duplex benchmark：MiniCPM-o 4.5 在 LiveSports-3K-CC 的 win rate 为 54.4，高于 StreamingVLM 的 45.6 和 LiveCC 的 41.5。但这个 benchmark 没有音频。它说明模型能随着持续画面生成更合适的描述，却没有测试助手说话时能否听见用户、处理插话，或让视觉、输入语音和输出语音长期保持同步。
 
 ### TAIL 是否真的改善了时间同步
 
@@ -204,7 +208,7 @@ Table 10 只报告可懂度和说话人相似度：
 | Fixed text | **0.86** | **74.5** | **2.38** | 64.9 |
 | Dynamic text（TAIL） | 1.04 | 74.1 | 3.93 | **65.1** |
 
-TAIL 的中文 CER 仍然可用，英文 WER 却从 fixed text 的 2.38 上升到 3.93，说明动态边界和有限前瞻存在语音稳定性代价。更关键的是，论文没有报告播放积压、文字到实际播放的陈旧度、打断残留、boundary 误差或延迟注入后的恢复时间。因此这张表证明 TAIL 能生成可懂语音，也暴露英文退化；它没有验证 TAIL 最核心的累计时间对齐收益。
+Table 10 能说明两件事：TAIL 生成的语音仍然可懂，但英文 WER 从 fixed text 的 2.38 上升到 3.93，动态边界和有限 look-ahead 可能损害语音稳定性。它没有回答更关键的问题：已经生成但还没播出的音频会不会越积越多？环境变化后，旧内容还会播多久？遇到额外延迟以后，系统能不能把队列重新降下来？因此，这张表验证了语音质量，没有直接验证 TAIL 宣称要改善的长期时间同步。
 
 ### 运行时是否跟得上现实时间
 
@@ -217,12 +221,12 @@ Table 12 提供了较强的系统证据：
 | llama.cpp-omni | FP16 | 0.27 | 19 GB | 0.46 | 19 GB |
 | llama.cpp-omni | INT4 | **0.21** | **11 GB** | **0.20** | **11 GB** |
 
-llama.cpp-omni 的 RTF 小于 1，说明报告实现具备持续跟上音频时钟的必要条件；PyTorch INT4 的 RTF 大于 1 又说明“模型支持流式”不等于系统天然实时。实时全双工至少同时要求
+llama.cpp-omni 的 RTF 小于 1，说明报告实现平均每处理一秒音频用时不到一秒，这是系统持续运行的必要条件。PyTorch INT4 的 RTF 大于 1，也说明模型接口支持 streaming，并不等于实际实现一定 real-time。要让 full-duplex 长时间工作，还需要同时满足
 
 $$
 \mathrm{RTF}<1
 \quad\land\quad
-\text{播放对齐误差长期有界}.
+\text{待播放的语音不会随着时间不断增加}.
 $$
 
 论文量化了左侧，没有量化右侧。
@@ -231,17 +235,17 @@ $$
 
 ### 可信贡献
 
-最可复用的贡献是 Omni-Flow 的问题建模：把视觉环境、音频环境和助手输出编译成标准因果模型可学习的时间事件序列，并把“保持沉默”设为显式动作。它为持续感知、主动输出和传统 turn-based 能力提供同一接口。
+Omni-Flow 最值得复用的地方，是它把“边看边听边说”改写成标准因果模型可以学习的序列：每个 `chunk` 先加入新的视觉和音频，再生成 `[listen]` 或 `[speak]`。这样，“保持沉默”也成了模型可以学习的动作，持续感知、主动开口和传统 turn-based 对话便能使用同一套接口。
 
 证据最扎实的工程贡献是完整可部署链：视觉与音频压缩、8B 语言骨干、约 0.3B 语音 decoder、流式波形解码和优化运行时在 11 GB INT4 内存下实现约 0.20–0.21 RTF。它证明 9B 级端到端全模态系统有机会在边缘硬件上持续运行。
 
-TAIL 则是一个有价值但欠验证的子贡献。它把“每秒承诺多少语言内容”转为时间戳监督下的序列边界学习，结构简单且可迁移；但论文只测了语音质量代价，没有直接测同步收益。
+TAIL 是一个结构很简单、但证据还不够完整的子贡献。它用发音时间戳决定训练序列中的 `boundary token`，再让模型自回归决定每个 `chunk` 生成几个 text token。论文测了这样做对语音质量的影响，却没有直接测量待播放音频是否真的更少。
 
 ### 最脆弱的假设
 
-最脆弱的假设是：模型只依靠离线时间戳监督、自身生成历史和 KV cache，就能在真实播放器状态不可见时长期维持同步。公开材料没有显示显式 `delay_seconds`、真实 playhead 或播放队列反馈。若网络、设备调度或声码器使实际播放落后，而模型内部仍认为每窗正常完成，TAIL 可能只是开环的平均调度先验，无法主动恢复真实 backlog。
+最脆弱的假设是：模型看不到真实播放器，却仍能只靠离线时间戳、自己的生成历史和 KV cache 长期保持同步。公开材料里没有显式 `delay_seconds`、真实 playhead 或 queue length。假如网络、设备调度或声码器让播放慢了半秒，模型内部仍可能认为前一个 `chunk` 已经正常完成。此时 TAIL 学到的更像训练数据里的平均节奏，它没有可靠信号知道真实播放器已经落后，也就很难主动把 backlog 降回来。
 
-这也放大 teacher forcing 的误差：训练时每个历史边界都正确，推理时过早或过晚的边界会进入下一窗历史；论文没有报告这种误差是否会自行收敛。
+teacher forcing 还带来第二个风险：训练时模型总能看到正确的历史 boundary；推理时如果一次过早或过晚生成 boundary，这个错误会进入下一个 `chunk` 的历史。论文没有报告这类误差会自行消失，还是会在长对话中继续累积。
 
 ### 作者承认与本文补充的局限
 
@@ -254,46 +258,46 @@ TAIL 则是一个有价值但欠验证的子贡献。它把“每秒承诺多少
 ### Takeaways
 
 - **问题**：多模态模型怎样在说话期间继续看和听，并根据新环境决定沉默、继续、停止、修正或主动提醒？
-- **核心 idea**：用共享时间轴反复写入视觉、环境音频和输出；Listen–Speak 控制是否开口；TAIL 用时间戳生成变长 chunk 标签，再让 boundary token 控制每窗文本承诺量。
+- **核心 idea**：每个 `chunk` 先写入新的视觉和环境音频，再决定 `[listen]` 或 `[speak]`；TAIL 用发音时间戳制作长短不同的训练标签，推理时由 `boundary token` 决定当前 `chunk` 生成几个 text token。
 - **可信结论**：9B 模型形成完整感知—文字—语音 token—波形链；报告运行时在 11 GB INT4 内存下达到约 0.20–0.21 RTF；一秒显式 LS 在论文消融中整体更稳。
-- **仍未证明**：TAIL 限制真实播放漂移、音频打断与重叠说话可靠、主动行为适当、长时三流同步稳定。
+- **仍未证明**：TAIL 能让真实播放队列长期保持稳定，系统能可靠处理插话与重叠说话，主动提醒不会频繁抢话，以及三条 stream 在长时间运行后仍然同步。
 - **可复用启发**：token 时钟、语音播放时钟和外部墙钟必须分开测量；RTF 小于 1 只解决计算积压，不能保证内容不过期。
 
 ### 一周最小复现
 
-只验证一个窄 claim：在相同权重、speech decoder 和运行时下，TAIL 是否比匹配平均长度的 Fixed-N 更能限制累计播放滞后。
+只验证一个窄 claim：在相同权重、speech decoder 和运行时下，TAIL 是否比平均长度相同的 Fixed-N 更能避免待播放语音越积越多。
 
-准备 60 条、每条 60–120 秒的连续场景脚本，包含画面变化、用户插话、中英文、快慢语速、长词、停顿和代码切换。TAIL 使用官方动态 boundary；Fixed-N 固定每窗文本数，$N$ 取 TAIL 在开发集上的平均值。记录环境 chunk 到达、文本与 boundary 生成、语音 token、波形入队和真实播放起止时间。
+准备 60 条、每条 60–120 秒的连续场景脚本，包含画面变化、用户插话、中英文、快慢语速、长词、停顿和代码切换。TAIL 使用官方动态 boundary；Fixed-N 固定每个 `chunk` 的 text-token 数，$N$ 取 TAIL 在开发集上的平均值。记录环境 `chunk` 到达、text token 与 boundary 生成、speech token、波形入队和真实播放起止时间。
 
 定义播放积压
 
 $$
-B(t)=\text{时刻 }t\text{ 已承诺但尚未播放的语音时长},
+B(t)=\text{时刻 }t\text{ 已生成但尚未播放的语音时长},
 $$
 
-并定义环境改变到最后一段旧状态音频结束之间的语义陈旧度。报告 $B(t)$ 的均值、P95 和随时长斜率，以及打断停止延迟、恢复到 $B<0.5$ 秒所需窗口、guardrail 触发率、CER/WER、SIM-o 与 RTF。在 20% 窗口额外注入 300 或 600 ms 计算/播放延迟。
+另一个指标直接记录：环境改变以后，最后一段依据旧环境生成的音频还会继续播放多久。报告 $B(t)$ 的均值、P95 和随时间变化的斜率，以及打断停止延迟、恢复到 $B<0.5$ 秒需要几个 `chunk`、guardrail 触发率、CER/WER、SIM-o 与 RTF。在 20% 的 `chunk` 中额外注入 300 或 600 ms 计算/播放延迟。
 
-预注册判据可以设为：TAIL 相比 Fixed-N 将 P95 backlog 和陈旧度至少降低 30%，CER/WER 相对恶化不超过 50%，且 RTF 仍小于 1。若 backlog 斜率长期为正或抖动后无法恢复，累计对齐 claim 应收窄。
+预注册判据可以设为：TAIL 相比 Fixed-N 将 P95 backlog 和“旧内容继续播放的时间”至少降低 30%，CER/WER 相对恶化不超过 50%，且 RTF 仍小于 1。若 backlog 长期持续上升，或注入抖动后始终降不回来，就应收窄论文关于长期对齐的解释。
 
 ### 反例设计
 
-连续运行十分钟，随机延迟真实播放器但不改变模型 KV cache，并在 backlog 最大时改变画面目标、插入用户语音。若边界仍维持训练时的平均模式，旧内容残留不减少，就说明模型内部序列历史不能代表真实执行状态。这个结果会反驳“TAIL 对实际播放形成闭环”的强解释，但仍允许较弱结论：TAIL 学到了离线训练时间轴上的开环调度先验。
+连续运行十分钟，随机让真实播放器变慢，但不改模型的 KV cache；在 backlog 最大时再改变画面目标或插入用户语音。如果模型仍按训练中的平均节奏生成 boundary，旧内容也没有更快停下，就说明它内部记录的生成历史不能代表播放器的真实进度。这个结果会反驳“TAIL 能根据实际播放情况自行纠偏”的强解释，但仍允许一个较弱结论：TAIL 学到了离线训练数据里的平均时间节奏。
 
 ### 后续研究与新认知
 
-检索截止 2026-10-13。Moshi 表明两条语音 codec 流可以在约 80 ms 粒度表达重叠说话，并显式用 100–500 ms 回声增强覆盖物理声学回路。Qwen2.5/3-Omni 主要优化请求后的 Thinker–Talker 流式语音生成；MiniCPM-o 4.5 的增量是持续时间窗中的交互控制。
+检索截止 2026-10-13。Moshi 表明两条语音 codec 流可以在约 80 ms 粒度表达重叠说话，并显式用 100–500 ms 回声增强覆盖物理声学回路。Qwen2.5/3-Omni 主要优化请求后的 Thinker–Talker 流式语音生成；MiniCPM-o 4.5 的增量是在连续 `chunk` 中反复决定听还是说。
 
-后于本文的 DuplexOmni 把不能阻塞的实时 interaction layer 与较慢的推理/工具层异步分离。AdaptDuplex 又将下一窗长度、Listen/Speak、memory 与异步请求控制显式 token 化，使用 0.48/0.64/0.96 秒动态窗口。其 v3 在 HumDial-FDBench 报告 MiniCPM-o 4.5 的 interruption 72.4、delay 2.203 s、final 60.6，而 AdaptDuplex 为 82.2、1.042 s、69.6。模型、数据和硬件同时不同，这不是动态窗口的单因素消融；它仍说明本文缺少的交互时机指标后来已经可以被直接评测。
+后于本文的 DuplexOmni 把不能阻塞的实时 interaction layer 与较慢的推理/工具层异步分离。AdaptDuplex 又把下一个 `chunk` 的长度、Listen/Speak、memory 与异步请求控制显式 token 化，并让 `chunk` 可取 0.48、0.64 或 0.96 秒。其 v3 在 HumDial-FDBench 报告 MiniCPM-o 4.5 的 interruption 72.4、delay 2.203 s、final 60.6，而 AdaptDuplex 为 82.2、1.042 s、69.6。模型、数据和硬件同时不同，所以这不是动态 `chunk` 的单因素消融；它仍说明本文缺少的交互时机指标后来已经可以被直接评测。
 
 ### Follow-up idea：Playback-Aware TAIL
 
-一个直接扩展是把真实播放器队列状态反馈给模型，例如量化为 `queue_empty`、`queue_0_250ms`、`queue_250_500ms`、`queue_500_1000ms` 与 `queue_over_1000ms`。队列近似满足
+一个直接扩展是把真实播放器还积压了多少音频反馈给模型，例如量化为 `queue_empty`、`queue_0_250ms`、`queue_250_500ms`、`queue_500_1000ms` 与 `queue_over_1000ms`。队列近似满足
 
 $$
 B_{k+1}=\max(0,B_k+d(y_k)-t-r_k),
 $$
 
-其中 $d(y_k)$ 是当前文字实际合成的语音时长，$t$ 是正常播放推进量，$r_k$ 表示取消、丢包或设备抖动。训练时注入播放器延迟和取消事件，并惩罚未来 backlog 超过阈值的面积，使模型从模仿离线时间轴转为观察执行状态后的闭环调度。
+其中 $d(y_k)$ 是当前文字实际合成的语音时长，$t$ 是一个 `chunk` 内播放器正常前进的时间，$r_k$ 表示取消、丢包或设备抖动。训练时注入播放器延迟和取消事件，并惩罚 backlog 超过阈值的持续时间。这样模型不再只模仿离线时间戳，而是能看到播放器究竟走到了哪里。
 
 最小证伪实验就是上一节的延迟注入：若真实 queue state 仍不能改善恢复时间，瓶颈更可能在语音时长预测、声码器或取消机制，而非状态不可观测性。该方案是基于论文缺口提出的分析设想，不是原文方法，也未完成全面新颖性检索。
 
@@ -313,4 +317,4 @@ $$
 
 论文部分依据用户提供的 22 页 PDF 全文，并以 arXiv 页面核验版本。经用户明确允许，本页从该 PDF 截取 Figure 3、Figure 4 与 Figure 5 的图形主体；截图不包含论文 caption 或周围正文，并在插入处标明原始图号、用途和证据边界。Tables 1、10、12 继续只用 Markdown 重建改变判断的数字。
 
-论文、代码与分析的证据身份保持分离：训练方法以 Sections 3–5 为准；特殊 token、默认窗口和 guardrail 来自官方公开推理实现；“开环调度先验”“Playback-Aware TAIL”和最小复现实验属于分析推断。官方材料没有披露 TAIL 时间戳生成、训练 serializer、loss mask、边界权重、文本 look-ahead 长度和真实播放器反馈，不能据此声称训练已完整可复现。
+论文、代码与分析的证据身份保持分离：训练方法以 Sections 3–5 为准；特殊 token、默认 `chunk` 长度和 guardrail 来自官方公开推理实现；“TAIL 只学到训练数据里的平均时间节奏”“Playback-Aware TAIL”和最小复现实验属于分析推断。官方材料没有披露 TAIL 时间戳生成、训练 serializer、loss mask、边界权重、文本 look-ahead 长度和真实播放器反馈，不能据此声称训练已完整可复现。
