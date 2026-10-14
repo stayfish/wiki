@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-10-14] ingest | 补充 MiniCPM-o 4.5 关键方法图
+
+- 根据用户明确许可，从已核验 PDF 以 300 dpi 截取 Figure 3、Figure 4 与 Figure 5 的图形主体，排除原始 caption 和周围正文。
+- 将范式对比、完整架构和 TAIL 三种交错策略分别放回问题空间、方法总览与 TAIL 机制段，并为每张图补充原始图号、解释用途和证据边界。
+- 数值结果继续使用可访问、可检索的 Markdown 表格，不以小字表格截图替换。
+
 ## [2026-10-14] ingest | MiniCPM-o 4.5: Towards Real-Time Full-Duplex Omni-Modal Interaction
 
 - 新增 arXiv v1 来源指针与 22 页全文 deepnote，沿分块讨论重建 streaming / real-time / full-duplex 边界、Omni-Flow 三流协议、端到端语音链和四阶段训练。
